@@ -6,7 +6,7 @@
 <style>body{margin:0}img{max-width:100%}</style>
 </head>
 <body>
-<title>ポッチ工房</title>
+<title>デジタルレゴブロック</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -224,6 +224,12 @@ input[type="range"] { accent-color: var(--brick); min-width: 0; }
 .spinner::before, .spinner::after { content: ""; position: absolute; top: -7px; width: 14px; height: 8px; border-radius: 4px 4px 0 0; background: var(--sun-deep); }
 .spinner::before { left: 7px; } .spinner::after { right: 7px; }
 @keyframes hop { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+.empty { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; pointer-events: none; z-index: 2; }
+.empty-card { pointer-events: auto; background: var(--paper); border-radius: 16px; box-shadow: var(--shadow); padding: 18px 20px;
+  max-width: 440px; display: grid; gap: 8px; border-top: 6px solid var(--sun); }
+.empty-card b { font-family: var(--font-display); font-size: 18px; }
+.empty-card p { margin: 0; color: var(--muted); }
+.placing .empty { display: none; }
 .drop { position: absolute; inset: 10px; border: 3px dashed var(--ink); border-radius: 16px; display: grid; place-content: center; background: rgb(255 207 0 / .25); font-family: var(--font-display); font-weight: 800; font-size: 20px; z-index: 3; pointer-events: none; }
 .toasts { position: absolute; left: 50%; transform: translateX(-50%); bottom: 60px; display: grid; gap: 8px; width: min(560px, calc(100% - 32px)); z-index: 6; }
 .toast { background: var(--ink); color: var(--paper); border-radius: 12px; padding: 10px 14px; box-shadow: var(--shadow); font-size: 13px; display: flex; gap: 10px; align-items: flex-start; }
@@ -254,6 +260,24 @@ dialog::backdrop { background: rgb(10 12 16 / .55); }
 .results button { text-align: left; border: 1px solid var(--line); background: var(--paper); border-radius: 8px; padding: 6px 10px; cursor: pointer; display: flex; gap: 10px; }
 .results button:hover { border-color: var(--ink); }
 .results code { font-weight: 700; min-width: 72px; }
+/* 変換の画面: 左にプレビュー 2 つ、右に設定。狭い画面ではプレビューが上 */
+dialog.wide { width: min(1180px, calc(100% - 24px)); }
+.cv-layout { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); align-items: start; }
+.cv-preview { position: sticky; top: 0; display: grid; gap: 8px; }
+.cv-opts { display: grid; gap: 16px; min-width: 0; }
+.pv-pane { position: relative; border-radius: var(--r); overflow: hidden; background: var(--stage); border: 1.5px solid var(--line); aspect-ratio: 16 / 9; max-height: 34vh; max-width: 100%; }
+.pv-pane canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.pv-label { position: absolute; left: 8px; top: 8px; background: var(--chip); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; box-shadow: var(--shadow); pointer-events: none; }
+.pv-busy { position: absolute; right: 8px; top: 8px; background: var(--sun); color: #16181B; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
+.pv-stats { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
+.dims { margin: 0; font-variant-numeric: tabular-nums; background: var(--tray); border-radius: 8px; padding: 8px 10px; }
+.dims b { font-family: var(--font-display); font-size: 16px; }
+@media (max-width: 860px) {
+  .cv-layout { grid-template-columns: 1fr; }
+  .cv-preview { position: static; grid-template-columns: 1fr 1fr; }
+  .pv-pane { aspect-ratio: 1 / 1; }
+  .pv-stats, .cv-preview .hint { grid-column: 1 / -1; }
+}
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; }
 .keys dt { text-align: right; }
 .keys dd { margin: 0; }
@@ -281,7 +305,7 @@ dialog::backdrop { background: rgb(10 12 16 / .55); }
   .top { row-gap: 8px; }
   .side { border-right: 0; border-top: 1px solid var(--line); }
   .panels { overflow: visible; }
-  .brand-tag { display: none; }
+  .brand-tag .tag-more { display: none; }  /* スマホでは「非公式のファンツール」だけ */
   .tbtn .lbl-wide { display: none; }
   .status .legal { margin-left: 0; }
 }
@@ -297,8 +321,8 @@ dialog::backdrop { background: rgb(10 12 16 / .55); }
         <rect x="6.5" y="15" width="27" height="5" rx="2.5" fill="#FFCF00" opacity=".9"/>
       </svg>
       <div>
-        <div class="brand-name">ポッチ工房</div>
-        <div class="brand-tag">3D モデルをブロックで組み立てる</div>
+        <div class="brand-name">デジタルレゴブロック</div>
+        <div class="brand-tag">非公式のファンツール<span class="tag-more"> · 3D モデルをブロックで組み立てる</span></div>
       </div>
     </div>
     <nav class="topnav" aria-label="ファイル">
@@ -466,6 +490,17 @@ dialog::backdrop { background: rgb(10 12 16 / .55); }
         <button class="btn" data-view="front" type="button">正面</button>
       </div>
       <div class="drop" id="drop" hidden>ここにファイルを落とすと読み込みます</div>
+      <div class="empty" id="empty" hidden>
+        <div class="empty-card">
+          <b>まだブロックがありません</b>
+          <p>3D モデルをひらいてブロックに変換するか、部品を選んで基礎板の上に置いてみましょう。ファイルをここに落としても読み込めます。</p>
+          <div class="row">
+            <button class="btn primary" id="empty-open" type="button">3D モデルをひらく</button>
+            <button class="btn" id="empty-sample" type="button">サンプル (アヒル) で試す</button>
+            <button class="btn" id="empty-place" type="button">部品を置く</button>
+          </div>
+        </div>
+      </div>
       <div class="busy" id="busy" hidden><div class="spinner"></div><div id="busy-text">変換しています…</div></div>
       <div class="toasts" id="toasts" aria-live="polite"></div>
     </section>
@@ -475,19 +510,27 @@ dialog::backdrop { background: rgb(10 12 16 / .55); }
     <span>シーン内 <b id="st-parts">0</b> パーツ</span>
     <span>選択 <b id="st-sel">0</b></span>
     <span id="st-size"></span>
-    <span class="legal">LEGO® は LEGO Group の商標です。このアプリは LEGO Group とは関係ありません。</span>
+    <span class="legal">LEGO® は LEGO Group の商標です。LEGO Group はこのアプリを後援・承認・推奨していません (非公式のファンツールです)。</span>
   </footer>
 </div>
 
 <!-- 変換の設定 -->
-<dialog id="dlg-convert" aria-labelledby="cv-title">
+<dialog id="dlg-convert" class="wide" aria-labelledby="cv-title">
   <form method="dialog" class="dlg" id="cv-form">
     <div class="dlg-head"><h2 id="cv-title">ブロックに変換</h2><button class="btn x" value="cancel" type="submit" aria-label="閉じる">×</button></div>
-    <div class="dlg-body">
+    <div class="dlg-body cv-layout">
+      <div class="cv-preview" aria-label="プレビュー">
+        <div class="pv-pane"><canvas id="pv-src"></canvas><span class="pv-label">変換前 (元の 3D モデル)</span></div>
+        <div class="pv-pane"><canvas id="pv-out"></canvas><span class="pv-label">変換後のプレビュー</span><span class="pv-busy" id="pv-busy" hidden>計算中…</span></div>
+        <p class="pv-stats" id="pv-stats"></p>
+        <p class="hint">ドラッグで回す・ホイール (2 本指) で拡大。2 つの画面は同じ向きで動きます。</p>
+      </div>
+      <div class="cv-opts">
       <p class="note" id="cv-file"></p>
       <div class="box">
         <h4>大きさ</h4>
         <div id="cv-res"></div>
+        <p class="dims" id="cv-dims"></p>
       </div>
       <div class="box">
         <h4>変換のしかた</h4>
@@ -508,6 +551,7 @@ dialog::backdrop { background: rgb(10 12 16 / .55); }
         </select>
         <div id="cv-parts"></div>
         <p class="note">1x1 を外すと、1 マスだけのすき間はとなりの空きにはみ出す 1x2 などで埋めます (形が少し太る)。それでも埋まらない 1 マスは空けたまま (中なら見えない。表面なら小さなくぼみになる)。</p>
+      </div>
       </div>
     </div>
     <div class="dlg-foot">
@@ -3128,6 +3172,7 @@ function refreshAll() {
   $("btn-redo").disabled = $("btn-redo2").disabled = !redoStack.length;
 }
 function refreshStatus() {
+  $("empty").hidden = S.parts.length > 0;  // 何もないときの案内
   $("st-parts").textContent = S.parts.length;
   $("st-sel").textContent = S.sel.size;
   if (S.parts.length) {
@@ -3263,15 +3308,16 @@ function resolutionWidget(root, get, set, idBase) {
 
 // ---------------------------------------------------------------- 3D モデルの変換
 const CV = { model: null, size: 24, updateRes: null };
-// 基本の部品: ブリック 1x1・1x2・1x4・2x2・2x3・2x4 (高さはブリックにそろえる)
-const BASIC_PARTS = ["3005.dat", "3004.dat", "3010.dat", "3003.dat", "3002.dat", "3001.dat"];
+// 基本の部品: ブリック 1x1・1x2・1x3・1x4・1x6・1x8・2x2・2x3・2x4・2x6・2x8 (高さはブリックにそろえる)
+const BASIC_PARTS = ["3005.dat", "3004.dat", "3622.dat", "3010.dat", "3009.dat", "3008.dat",
+  "3003.dat", "3002.dat", "3001.dat", "2456.dat", "3007.dat"];
 const PART_PRESETS = [
   ["basic", "基本セット", "BRICK", BASIC_PARTS],
   ["all", "全部", null, CONVERT_PARTS.map(([p]) => p)],
   ["no1x1", "1x1 なし", null, CONVERT_PARTS.map(([p]) => p).filter((p) => p !== "3005.dat" && p !== "3024.dat")],
 ];
 function buildConvertDialog() {
-  CV.updateRes = resolutionWidget($("cv-res"), () => CV.size, (v) => { CV.size = v; }, "cv");
+  CV.updateRes = resolutionWidget($("cv-res"), () => CV.size, (v) => { CV.size = v; schedulePreview(); }, "cv");
   const box = $("cv-parts");
   box.textContent = "";
   for (const [height, label] of [[PLATE_H, "プレート"], [BRICK_H, "ブリック"]]) {
@@ -3324,16 +3370,150 @@ function buildConvertDialog() {
   for (const id of ["cv-unify", "cv-unify-to"]) $(id).addEventListener("change", markPreset);
   box.addEventListener("change", markPreset);
   applyPreset("basic");  // はじめは基本の部品
-  $("dlg-convert").addEventListener("close", () => {
-    if ($("dlg-convert").returnValue === "ok" && CV.model) runConvert();
+  // 設定を変えたら、変換後のプレビューを作り直す
+  $("cv-form").addEventListener("change", () => schedulePreview());
+  $("cv-presets").addEventListener("click", () => schedulePreview());
+  // 「変換する」: ダイアログの close イベントは裏のタブで遅れることがあるので、送信 (submit) のときに始める
+  $("cv-form").addEventListener("submit", (e) => {
+    if (!e.submitter || e.submitter.value !== "ok" || !CV.model) return;
+    const opts = convertOptions();
+    const ready = PV.result && PV.result.key === optsKey(opts) ? PV.result.res : null;  // プレビューと同じ設定なら作り直さない
+    runConvert(opts, CV.model, false, ready);
   });
 }
 function openConvertDialog(model) {
   CV.model = model;
-  $("cv-file").textContent = `${model.name}${model.ext} を LEGO 互換のブロックに置き換えます。`;
+  $("cv-file").textContent = `${model.name}${model.ext} をブロックに置き換えます。`;
   CV.updateRes();
   $("dlg-convert").returnValue = "";
   $("dlg-convert").showModal();
+  showPreviewModel(model);
+}
+
+// ---- 変換の画面のプレビュー: 左 = 元の 3D モデル、右 = 今の設定で変換したもの。カメラは 2 つで共有
+const PV = { ready: false, result: null, timer: 0, seq: 0 };
+function optsKey(o) {  // 変換の結果に効く設定だけ
+  return JSON.stringify([o.scaleMode, o.size, o.hollow, o.basicColors, o.bottomUpOnly, o.height,
+    o.allowed ? [...o.allowed].sort() : null]);
+}
+function previewScene() {
+  const sc = new THREE.Scene();
+  sc.add(new THREE.HemisphereLight(0xffffff, 0xb4bcc6, 1.2));
+  sc.add(new THREE.AmbientLight(0xffffff, 0.5));
+  const top = new THREE.DirectionalLight(0xffffff, 1.0);
+  top.position.set(-4, 10, 5);
+  sc.add(top);
+  for (let i = 0; i < 4; i++) {
+    const a = (i + 0.5) * Math.PI / 2, l = new THREE.DirectionalLight(0xffffff, SIDE_LIGHT * S.light);
+    l.position.set(Math.cos(a) * 10, 2.5, Math.sin(a) * 10);
+    sc.add(l);
+  }
+  return sc;
+}
+function initPreview() {
+  if (PV.ready) return;
+  PV.ready = true;
+  PV.camera = new THREE.PerspectiveCamera(35, 1.6, 0.1, 2000);
+  PV.views = ["pv-src", "pv-out"].map((id) => {
+    const canvas = $(id);
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    const scene = previewScene();
+    const controls = new OrbitControls(PV.camera, canvas);
+    controls.enableDamping = false;
+    controls.addEventListener("change", renderPreviewViews);
+    new ResizeObserver(renderPreviewViews).observe(canvas);
+    return { canvas, renderer, scene, controls };
+  });
+  PV.src = new THREE.Group(); PV.src.matrixAutoUpdate = false;
+  PV.out = new THREE.Group();
+  PV.views[0].scene.add(PV.src);
+  PV.views[1].scene.add(PV.out);
+}
+function renderPreviewViews() {
+  if (!PV.ready) return;
+  for (const v of PV.views) {
+    const w = v.canvas.clientWidth, h = v.canvas.clientHeight;
+    if (!w || !h) continue;
+    v.renderer.setSize(w, h, false);
+    v.scene.background = scene.background;
+    PV.camera.aspect = w / h;
+    PV.camera.updateProjectionMatrix();
+    v.renderer.render(v.scene, PV.camera);
+  }
+}
+function showPreviewModel(model) {
+  initPreview();
+  for (const c of [...PV.src.children]) PV.src.remove(c);
+  PV.src.add(model.root.clone(true));
+  PV.result = null;
+  PV.framed = false;
+  schedulePreview(0);
+}
+function schedulePreview(delay = 180) {
+  if (!CV.model || !$("dlg-convert").open) return;
+  clearTimeout(PV.timer);
+  $("pv-busy").hidden = false;
+  PV.timer = setTimeout(updatePreview, delay);
+}
+async function updatePreview() {
+  const opts = convertOptions(), key = optsKey(opts), my = ++PV.seq;
+  const need = opts.height === "BRICK" ? BRICK_H : PLATE_H;
+  if (!boxParts(need, opts.allowed).length) {
+    $("pv-busy").hidden = true;
+    $("pv-stats").textContent = `使う${need === BRICK_H ? "ブリック" : "プレート"}が選ばれていません`;
+    return;
+  }
+  if (PV.result && PV.result.key === key) { $("pv-busy").hidden = true; return; }
+  await nextFrame();
+  if (my !== PV.seq) return;  // もっと新しい設定が来た
+  let res;
+  try { res = convertModel(CV.model.root, CV.model.ext, opts); } catch (e) {
+    $("pv-busy").hidden = true; $("pv-stats").textContent = `プレビューを作れませんでした: ${e.message || e}`; return;
+  }
+  if (my !== PV.seq) return;
+  PV.result = { key, res };
+  // 変換後: パーツを部品ごとにまとめて描く
+  for (const c of [...PV.out.children]) { PV.out.remove(c); c.dispose(); }
+  const byPart = new Map();
+  for (const q of res.parts) { if (!byPart.has(q.part)) byPart.set(q.part, []); byPart.get(q.part).push(q); }
+  for (const [part, list] of byPart) {
+    const mesh = new THREE.InstancedMesh(partGeometry(part), partMaterial, list.length);
+    list.forEach((q, i) => { mesh.setMatrixAt(i, partMatrix(q, _m4)); mesh.setColorAt(i, partColor(q.color)); });
+    mesh.instanceMatrix.needsUpdate = true;
+    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+    PV.out.add(mesh);
+  }
+  // 変換前: 同じ大きさ・同じ場所に重なるように置く
+  PV.src.matrix.copy(sourceMatrix(res.frame));
+  // カメラ: 細かさを変えても同じ見え方になるよう、毎回モデルに合わせる (向きはそのまま)
+  const box = modelBox(res.parts);
+  const c = box.getCenter(new THREE.Vector3()), r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 1);
+  const dir = PV.framed ? PV.camera.position.clone().sub(PV.views[0].controls.target).normalize()
+    : new THREE.Vector3(0.75, 0.62, 1.05).normalize();
+  const d = r / Math.sin(THREE.MathUtils.degToRad(PV.camera.fov / 2)) * 1.08;
+  for (const v of PV.views) v.controls.target.copy(c);
+  PV.camera.position.copy(c).addScaledVector(dir, d);
+  PV.camera.near = d / 100; PV.camera.far = d * 20;
+  PV.framed = true;
+  for (const v of PV.views) v.controls.update();
+  renderPreviewViews();
+  // 大きさ・パーツ数
+  const [nx, ny, nz] = res.info.studs, layerH = opts.height === "BRICK" ? BRICK_H : PLATE_H;
+  const unit = opts.height === "BRICK" ? "ブリック" : "プレート";
+  const cm = (ldu) => (ldu * 0.04).toFixed(1);  // 1 LDU = 0.4 mm
+  $("cv-dims").textContent = "";
+  const b = document.createElement("b");
+  b.textContent = `横 ${nx} × 奥行き ${ny} ポッチ × 高さ ${nz} ${unit}`;
+  const sub = document.createElement("div");
+  sub.className = "hint";
+  sub.textContent = `約 ${cm(nx * STUD)} × ${cm(ny * STUD)} × ${cm(nz * layerH)} cm (横 × 奥行き × 高さ)`;
+  $("cv-dims").append(b, sub);
+  const levels = new Set(res.parts.map((q) => roundTo(q.z - partHeight(q.part), 3))).size;
+  let stats = `${res.parts.length} パーツ・${res.info.colors.length} 色・${levels} 段`;
+  if (res.info.unbuildable) stats += `・下から積めない ${res.info.unbuildable} パーツを抜く`;
+  $("pv-stats").textContent = stats;
+  $("pv-busy").hidden = true;
 }
 function convertOptions() {
   const unify = $("cv-unify").checked;
@@ -3362,7 +3542,7 @@ function convertReport(created, info) {
   if (floating.size) msg += `。本体とつながっていないパーツが ${floating.size} 個あります (組み立てチェックで確認)`;
   return [floating.size ? "warn" : "info", msg];
 }
-async function runConvert(opts = convertOptions(), model = CV.model, silent = false) {
+async function runConvert(opts = convertOptions(), model = CV.model, silent = false, ready = null) {
   const need = opts.height === "BRICK" ? BRICK_H : PLATE_H;
   if (!boxParts(need, opts.allowed).length) {
     const kind = need === BRICK_H ? "ブリック" : "プレート";
@@ -3373,7 +3553,7 @@ async function runConvert(opts = convertOptions(), model = CV.model, silent = fa
   await nextFrame();
   try {
     const t0 = performance.now();
-    const res = convertModel(model.root, model.ext, opts);
+    const res = ready || convertModel(model.root, model.ext, opts);
     if (opts.replace) S.sources.clear();
     const name = opts.replace ? model.name : uniqueGroupName(model.name);
     const offsetX = opts.replace ? 0 : besideOffset(res.parts);
@@ -3670,7 +3850,9 @@ function selectTab(name) {
 }
 function wire() {
   for (const t of ["build", "order", "convert", "list"]) $("tabbtn-" + t).onclick = () => selectTab(t);
-  $("btn-open").onclick = $("btn-open2").onclick = () => $("file-open").click();
+  $("btn-open").onclick = $("btn-open2").onclick = $("empty-open").onclick = () => $("file-open").click();
+  $("empty-sample").onclick = () => openSample("duck");
+  $("empty-place").onclick = () => { selectTab("build"); setPlacing(true); };
   $("file-open").onchange = (e) => { openFiles(e.target.files); e.target.value = ""; };
   // サンプル
   const menu = $("sample-menu");
@@ -3691,8 +3873,8 @@ function wire() {
   };
   document.addEventListener("click", () => { menu.hidden = true; $("btn-sample").setAttribute("aria-expanded", "false"); });
   $("btn-export").onclick = openExportDialog;
-  $("dlg-export").addEventListener("close", () => {
-    if ($("dlg-export").returnValue !== "ok") return;
+  $("ex-form").addEventListener("submit", (e) => {
+    if (!e.submitter || e.submitter.value !== "ok") return;
     const kind = $$("input[name=ex-kind]").find((r) => r.checked).value;
     const name = safeName($("ex-name").value);
     S.lastName = name; saveLocal();
@@ -3870,9 +4052,6 @@ async function start() {
   } catch (e) { console.warn("thumbnails", e); }
   if (restored) {
     toast(`前回の続き (${S.parts.length} パーツ) を開きました。新しく始めるときは「つくる」の一番下の「すべてのパーツを消す」で`, "info", 9000);
-  } else if (await openSample("duck", true)) {
-    undoStack.length = 0; refreshAll();
-    toast("サンプルのアヒル (glb) を細かさ「ふつう (24)」・基本の部品 (ブリック 6 種類) で変換しました。「組み立て順」で 1 個ずつ見たり、「書き出す」で .ldr にしたりできます", "info", 12000);
   }
 }
 // 動作確認用 (開発者ツールから触れるように)
