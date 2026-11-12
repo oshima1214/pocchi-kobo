@@ -269,6 +269,9 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 .pv-pane canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .pv-label { position: absolute; left: 8px; top: 8px; background: var(--chip); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; box-shadow: var(--shadow); pointer-events: none; }
 .pv-busy { position: absolute; right: 8px; top: 8px; background: var(--sun); color: #16181B; border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 700; }
+.pv-delta { margin: 0; font-size: 12px; color: var(--muted); }
+.pv-delta.flash { animation: pvflash 1.2s ease-out; border-radius: 6px; }
+@keyframes pvflash { from { background: var(--sun); color: #16181B; } to { background: transparent; } }
 .pv-stats { margin: 0; font-weight: 700; font-variant-numeric: tabular-nums; }
 .dims { margin: 0; font-variant-numeric: tabular-nums; background: var(--tray); border-radius: 8px; padding: 8px 10px; }
 .dims b { font-family: var(--font-display); font-size: 16px; }
@@ -278,6 +281,9 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
   .pv-pane { aspect-ratio: 1 / 1; }
   .pv-stats, .cv-preview .hint { grid-column: 1 / -1; }
 }
+.quick { border: 1.5px solid var(--line); border-radius: var(--r); padding: 8px 12px; }
+.quick summary { cursor: pointer; font-weight: 700; }
+.quick[open] { display: grid; gap: 10px; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; }
 .keys dt { text-align: right; }
 .keys dd { margin: 0; }
@@ -419,6 +425,10 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
         <!-- 組み立て順 -->
         <section class="panel" id="tab-order" role="tabpanel" aria-labelledby="tabbtn-order" hidden>
           <div class="sec">
+            <h3>大きさ</h3>
+            <div class="dims" id="order-size"></div>
+          </div>
+          <div class="sec">
             <h3>組み立て順に見る (下から)</h3>
             <div class="stepper">
               <span class="lbl">1 段ずつ</span>
@@ -456,12 +466,17 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
             <div class="row" id="sample-row"></div>
           </div>
           <div class="sec" id="reconv" hidden>
-            <h3>変換したモデルの細かさを変える</h3>
+            <h3>変換したモデルを作り直す</h3>
             <div class="readout" id="reconv-now"></div>
-            <div id="reconv-res"></div>
-            <label class="check"><input type="checkbox" id="reconv-bu"><span>下から積めるパーツだけにする</span></label>
+            <button class="btn primary block" id="btn-reconvert-full" type="button">大きさ・変換のしかた・使うパーツを変えて作り直す</button>
+            <p class="hint">変換の画面がプレビュー付きで開きます。今の設定から始まります。</p>
+            <details class="quick">
+              <summary>細かさだけすぐ変える</summary>
+              <div id="reconv-res"></div>
+              <label class="check"><input type="checkbox" id="reconv-bu"><span>下から積めるパーツだけにする</span></label>
+              <button class="btn dark block" id="btn-reconvert" type="button">この細かさで作り直す</button>
+            </details>
             <label class="check"><input type="checkbox" id="opt-source"><span>元のモデルを重ねて表示</span></label>
-            <button class="btn dark block" id="btn-reconvert" type="button">この細かさで作り直す</button>
           </div>
         </section>
 
@@ -522,7 +537,11 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
       <div class="cv-preview" aria-label="プレビュー">
         <div class="pv-pane"><canvas id="pv-src"></canvas><span class="pv-label">変換前 (元の 3D モデル)</span></div>
         <div class="pv-pane"><canvas id="pv-out"></canvas><span class="pv-label">変換後のプレビュー</span><span class="pv-busy" id="pv-busy" hidden>計算中…</span></div>
+        <div class="row pv-tools">
+          <label class="check"><input type="checkbox" id="pv-cut"><span>断面で見る <small class="hint">中を空けたときの中身が見える</small></span></label>
+        </div>
         <p class="pv-stats" id="pv-stats"></p>
+        <p class="pv-delta" id="pv-delta" aria-live="polite"></p>
         <p class="hint">ドラッグで回す・ホイール (2 本指) で拡大。2 つの画面は同じ向きで動きます。</p>
       </div>
       <div class="cv-opts">
@@ -534,10 +553,8 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
       </div>
       <div class="box">
         <h4>変換のしかた</h4>
-        <label class="check"><input type="checkbox" id="cv-replace" checked><span>今のモデルを消してから置く <small class="hint">オフにすると、今のモデルの横に並べて置く</small></span></label>
         <label class="check"><input type="checkbox" id="cv-hollow"><span>中を空ける (表面だけ) <small class="hint">パーツ数を減らす。外から見た形は同じ</small></span></label>
         <label class="check"><input type="checkbox" id="cv-basic"><span>色メニューの 13 色だけ使う <small class="hint">オフなら、今売られている主な 40 色から近い色を選ぶ</small></span></label>
-        <label class="check"><input type="checkbox" id="cv-keep" checked><span>元のモデルを残す <small class="hint">重ねて表示したり、細かさを変えて作り直したりできる</small></span></label>
         <label class="check"><input type="checkbox" id="cv-bu"><span>下から積めるパーツだけにする <small class="hint">上の部品の下側に付けるしかないパーツを入れない。形の下側が少し欠ける</small></span></label>
         <p class="note" id="cv-both" hidden>両方オン: 表面を下から積めるよう、支えに要る中身は残します (中はほぼ空きません)</p>
       </div>
@@ -551,6 +568,11 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
         </select>
         <div id="cv-parts"></div>
         <p class="note">1x1 を外すと、1 マスだけのすき間はとなりの空きにはみ出す 1x2 などで埋めます (形が少し太る)。それでも埋まらない 1 マスは空けたまま (中なら見えない。表面なら小さなくぼみになる)。</p>
+      </div>
+      <div class="box" id="cv-place-box">
+        <h4>置き方 <small class="hint">(変換の結果・プレビューは変わりません)</small></h4>
+        <label class="check"><input type="checkbox" id="cv-replace" checked><span>今のモデルを消してから置く <small class="hint">オフにすると、今のモデルの横に並べて置く</small></span></label>
+        <label class="check"><input type="checkbox" id="cv-keep" checked><span>元のモデルを残す <small class="hint">重ねて表示したり、設定を変えて作り直したりできる</small></span></label>
       </div>
       </div>
     </div>
@@ -3191,8 +3213,45 @@ function refreshHud() {
   else if (S.layer) chip(`${S.layer} / ${levels.length} 段目まで表示`);
   if (S.showSource) chip("元のモデルを重ねて表示中");
 }
+// モデルの大きさ: (横ポッチ, 奥行きポッチ, 高さ LDU)。パーツのマスから求める
+function modelSize(parts) {
+  if (!parts.length) return null;
+  let x0 = Infinity, x1 = -Infinity, y0 = Infinity, y1 = -Infinity, z0 = Infinity, z1 = -Infinity;
+  for (const p of parts) {
+    for (const c of partCells(p)) {
+      const col = Math.floor(c / 4096), cx = Math.floor(col / KK) - OFF, cy = col % KK - OFF;
+      x0 = Math.min(x0, cx); x1 = Math.max(x1, cx); y0 = Math.min(y0, cy); y1 = Math.max(y1, cy);
+    }
+    z0 = Math.min(z0, partBottom(p)); z1 = Math.max(z1, p.z);
+  }
+  return [(x1 - x0) / 2 + 1, (y1 - y0) / 2 + 1, z1 - z0];
+}
+function sizeText(sz) {
+  const [w, d, h] = sz, cm = (ldu) => (ldu * 0.04).toFixed(1);
+  const plates = h / PLATE_H, bricks = h / BRICK_H;
+  const hb = Number.isInteger(bricks) ? `${bricks} ブリック` : `${bricks.toFixed(1)} ブリック`;
+  return [`横 ${w} × 奥行き ${d} ポッチ × 高さ ${plates} プレート (${hb}分)`,
+    `約 ${cm(w * STUD)} × ${cm(d * STUD)} × ${cm(h)} cm (横 × 奥行き × 高さ)`];
+}
 function refreshOrder() {
   const { seq, levels } = steps();
+  const box = $("order-size");
+  box.textContent = "";
+  const sz = modelSize(S.parts);
+  if (!sz) box.textContent = "パーツがありません";
+  else {
+    const [main, sub] = sizeText(sz);
+    const b = document.createElement("b"); b.textContent = main;
+    const d = document.createElement("div"); d.className = "hint"; d.textContent = sub;
+    box.append(b, d);
+    const shown = previewParts();
+    if (shown && shown.size) {
+      const [, , h] = modelSize([...shown]);
+      const e = document.createElement("div"); e.className = "hint";
+      e.textContent = `いま表示している所までの高さ: ${h / PLATE_H} プレート (約 ${(h * 0.04).toFixed(1)} cm)`;
+      box.append(e);
+    }
+  }
   const total = S.parts.length, L = levels.length;
   $("layer-num").value = S.layer; $("layer-num").max = L;
   $("piece-num").value = S.piece; $("piece-num").max = total;
@@ -3370,20 +3429,33 @@ function buildConvertDialog() {
   for (const id of ["cv-unify", "cv-unify-to"]) $(id).addEventListener("change", markPreset);
   box.addEventListener("change", markPreset);
   applyPreset("basic");  // はじめは基本の部品
+  Object.assign(CV, { sync, markPreset });
   // 設定を変えたら、変換後のプレビューを作り直す
-  $("cv-form").addEventListener("change", () => schedulePreview());
+  $("cv-form").addEventListener("change", (e) => {
+    if (e.target.id === "pv-cut") { applyCut(); return; }
+    if (e.target.id === "cv-hollow" && e.target.checked && !$("pv-cut").checked) {  // 中を空けたら断面で見せる
+      $("pv-cut").checked = true; applyCut();
+    }
+    schedulePreview();
+  });
   $("cv-presets").addEventListener("click", () => schedulePreview());
   // 「変換する」: ダイアログの close イベントは裏のタブで遅れることがあるので、送信 (submit) のときに始める
   $("cv-form").addEventListener("submit", (e) => {
     if (!e.submitter || e.submitter.value !== "ok" || !CV.model) return;
     const opts = convertOptions();
     const ready = PV.result && PV.result.key === optsKey(opts) ? PV.result.res : null;  // プレビューと同じ設定なら作り直さない
-    runConvert(opts, CV.model, false, ready);
+    if (CV.group) reconvertGroup(CV.group, opts, ready);  // 変換タブから: そのモデルだけを作り直す
+    else runConvert(opts, CV.model, false, ready);
   });
 }
-function openConvertDialog(model) {
+function openConvertDialog(model, group = null) {
   CV.model = model;
-  $("cv-file").textContent = `${model.name}${model.ext} をブロックに置き換えます。`;
+  CV.group = group;  // null = 新しく変換 / 名前 = その変換モデルを作り直す
+  $("cv-title").textContent = group ? "設定を変えて作り直す" : "ブロックに変換";
+  $("cv-ok").textContent = group ? "作り直す" : "変換する";
+  $("cv-place-box").hidden = !!group;
+  $("cv-file").textContent = group ? `${group} (${model.name}${model.ext}) を、今の設定から作り直します。`
+    : `${model.name}${model.ext} をブロックに置き換えます。`;
   CV.updateRes();
   $("dlg-convert").returnValue = "";
   $("dlg-convert").showModal();
@@ -3425,6 +3497,11 @@ function initPreview() {
     new ResizeObserver(renderPreviewViews).observe(canvas);
     return { canvas, renderer, scene, controls };
   });
+  PV.cut = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);  // 手前半分を切り落とす面
+  PV.mat = partMaterial.clone();
+  PV.mat.side = THREE.DoubleSide;  // 断面から中が見えるように
+  PV.ghostMat = new THREE.MeshBasicMaterial({ color: 0xd7141a, transparent: true, opacity: 0.35, depthWrite: false });
+  for (const v of PV.views) v.renderer.localClippingEnabled = true;
   PV.src = new THREE.Group(); PV.src.matrixAutoUpdate = false;
   PV.out = new THREE.Group();
   PV.views[0].scene.add(PV.src);
@@ -3445,8 +3522,19 @@ function renderPreviewViews() {
 function showPreviewModel(model) {
   initPreview();
   for (const c of [...PV.src.children]) PV.src.remove(c);
-  PV.src.add(model.root.clone(true));
+  const clone = model.root.clone(true);
+  PV.srcMats = [];
+  clone.traverse((o) => {  // 断面で切れるよう、材質は複製して使う (元のモデルの材質は変えない)
+    if (!o.isMesh) return;
+    const list = (Array.isArray(o.material) ? o.material : [o.material]).map((m) => {
+      const c = m.clone(); c.side = THREE.DoubleSide; PV.srcMats.push(c); return c;
+    });
+    o.material = Array.isArray(o.material) ? list : list[0];
+  });
+  PV.src.add(clone);
   PV.result = null;
+  PV.last = null;
+  $("pv-delta").textContent = "";
   PV.framed = false;
   schedulePreview(0);
 }
@@ -3478,14 +3566,32 @@ async function updatePreview() {
   const byPart = new Map();
   for (const q of res.parts) { if (!byPart.has(q.part)) byPart.set(q.part, []); byPart.get(q.part).push(q); }
   for (const [part, list] of byPart) {
-    const mesh = new THREE.InstancedMesh(partGeometry(part), partMaterial, list.length);
+    const mesh = new THREE.InstancedMesh(partGeometry(part), PV.mat, list.length);
     list.forEach((q, i) => { mesh.setMatrixAt(i, partMatrix(q, _m4)); mesh.setColorAt(i, partColor(q.color)); });
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     PV.out.add(mesh);
   }
+  // 下から積めるパーツだけのとき: 抜けるパーツを赤く半透明で見せる (中を空けるときは並べ方が変わるので出さない)
+  let removed = 0;
+  if (opts.bottomUpOnly && !opts.hollow) {
+    const full = convertModel(CV.model.root, CV.model.ext, { ...opts, bottomUpOnly: false });
+    const kept = new Set(res.parts.map((q) => `${q.part}|${q.x}|${q.y}|${q.z}|${q.rot}`));
+    const gone = full.parts.filter((q) => !kept.has(`${q.part}|${q.x}|${q.y}|${q.z}|${q.rot}`));
+    removed = gone.length;
+    const byP = new Map();
+    for (const q of gone) { if (!byP.has(q.part)) byP.set(q.part, []); byP.get(q.part).push(q); }
+    for (const [part, list] of byP) {
+      const mesh = new THREE.InstancedMesh(partGeometry(part), PV.ghostMat, list.length);
+      list.forEach((q, i) => mesh.setMatrixAt(i, partMatrix(q, _m4)));
+      mesh.instanceMatrix.needsUpdate = true;
+      PV.out.add(mesh);
+    }
+  }
   // 変換前: 同じ大きさ・同じ場所に重なるように置く
   PV.src.matrix.copy(sourceMatrix(res.frame));
+  PV.box = modelBox(res.parts);
+  applyCut(false);
   // カメラ: 細かさを変えても同じ見え方になるよう、毎回モデルに合わせる (向きはそのまま)
   const box = modelBox(res.parts);
   const c = box.getCenter(new THREE.Vector3()), r = Math.max(box.getSize(new THREE.Vector3()).length() / 2, 1);
@@ -3511,9 +3617,30 @@ async function updatePreview() {
   $("cv-dims").append(b, sub);
   const levels = new Set(res.parts.map((q) => roundTo(q.z - partHeight(q.part), 3))).size;
   let stats = `${res.parts.length} パーツ・${res.info.colors.length} 色・${levels} 段`;
-  if (res.info.unbuildable) stats += `・下から積めない ${res.info.unbuildable} パーツを抜く`;
+  if (res.info.unbuildable) stats += `・下から積めない ${res.info.unbuildable} パーツを抜く${removed ? " (赤い半透明)" : ""}`;
   $("pv-stats").textContent = stats;
+  // 前の設定からの変化 (見た目で分かりにくい変化も数で伝える)
+  const now = { n: res.parts.length, colors: res.info.colors.join(","), c: res.info.colors.length };
+  if (PV.last) {
+    const d = now.n - PV.last.n;
+    let msg = d ? `前の設定から ${d > 0 ? "+" : "−"}${Math.abs(d)} パーツ` : "パーツ数は前の設定と同じ";
+    if (now.colors !== PV.last.colors) msg += `・色 ${PV.last.c} → ${now.c} 色`;
+    else if (!d) msg += "・色も同じ (このモデルでは見た目が変わりません)";
+    if (opts.hollow) msg += "。中を空けると外からは同じに見えます。「断面で見る」で中が分かります";
+    $("pv-delta").textContent = msg;
+    $("pv-delta").classList.remove("flash"); void $("pv-delta").offsetWidth; $("pv-delta").classList.add("flash");
+  }
+  PV.last = now;
   $("pv-busy").hidden = true;
+}
+// 断面: モデルの真ん中で手前半分を切り落とす (変換前・変換後の両方)
+function applyCut(render = true) {
+  if (!PV.ready) return;
+  const on = $("pv-cut").checked && PV.box;
+  if (on) PV.cut.constant = PV.box.getCenter(new THREE.Vector3()).z;
+  const planes = on ? [PV.cut] : [];
+  for (const m of [PV.mat, ...(PV.srcMats || [])]) { m.clippingPlanes = planes; m.needsUpdate = true; }
+  if (render) renderPreviewViews();
 }
 function convertOptions() {
   const unify = $("cv-unify").checked;
@@ -3617,12 +3744,18 @@ function refreshConvert() {
   if (!_reconvRes) _reconvRes = resolutionWidget($("reconv-res"), () => S.convSize, (v) => { S.convSize = v; }, "rc");
   else _reconvRes();
   $("reconv-bu").checked = S.convBottomUp;
-  $("btn-reconvert").disabled = !S.sources.has(name);
+  $("btn-reconvert").disabled = $("btn-reconvert-full").disabled = !S.sources.has(name);
   $("opt-source").checked = S.showSource;
 }
-async function reconvert() {
+async function reconvert() {  // 変換タブの「細かさだけすぐ変える」
   const name = convertedGroup();
   if (!name) return toast("3D モデルから変換したモデルがありません", "err");
+  const conf = S.groups.get(name).conf;
+  return reconvertGroup(name, { ...conf, allowed: conf.allowed ? new Set(conf.allowed) : null, scaleMode: "SIZE",
+    size: S.convSize, bottomUpOnly: S.convBottomUp });
+}
+// 変換モデル name を、設定 opts で作り直す (ほかのパーツはそのまま、横に並べた位置もそのまま)
+async function reconvertGroup(name, opts, ready = null) {
   const src = S.sources.get(name);
   if (!src) return toast("元のモデルが残っていません。もう一度ひらいて変換してください", "err");
   const conf = S.groups.get(name).conf;
@@ -3630,24 +3763,44 @@ async function reconvert() {
   setBusy("作り直しています…");
   await nextFrame();
   try {
-    const opts = { ...conf, allowed: conf.allowed ? new Set(conf.allowed) : null, scaleMode: "SIZE", size: S.convSize, bottomUpOnly: S.convBottomUp };
-    const res = convertModel(src.root, src.ext, opts);
+    const res = ready || convertModel(src.root, src.ext, opts);
+    const keep = { hollow: opts.hollow, basicColors: opts.basicColors, height: opts.height, scaleMode: opts.scaleMode,
+      size: opts.size, bottomUpOnly: opts.bottomUpOnly, allowed: opts.allowed ? [...opts.allowed] : null };
     edit(() => {
       S.parts = S.parts.filter((p) => p.group !== name);
       const dx = conf.offsetX || 0;  // 横に並べて置いたモデルは同じ場所に作り直す
       const created = res.parts.map((q) => newPart(q.part, q.color, q.x + dx, q.y, q.z, q.rot, name));
       S.parts.push(...created);
       S.sel.clear(); S.active = created.length ? created[0].id : null;
-      S.groups.set(name, { conf: { ...conf, scaleMode: "SIZE", size: S.convSize, bottomUpOnly: S.convBottomUp } });
+      S.groups.set(name, { conf: { ...conf, ...keep } });
     });
     src.frame = res.frame;
+    S.convSize = opts.size; S.convBottomUp = opts.bottomUpOnly;
     rebuildOverlay();
+    refreshConvert();
     const [kind, msg] = convertReport(S.parts.filter((p) => p.group === name), res.info);
-    toast(msg.replace("変換しました", `作り直しました (一番長い辺 ${S.convSize} ポッチ)`), kind, 12000);
+    toast(msg.replace("変換しました", `作り直しました (一番長い辺 ${opts.size} ポッチ)`), kind, 12000);
   } catch (e) {
     console.error(e);
     toast(`作り直せませんでした: ${e.message || e}`, "err");
   } finally { setBusy(null); }
+}
+// 変換タブの「大きさ・変換のしかた・使うパーツを変えて作り直す」: 今の設定を入れた変換の画面を開く
+function openReconvertDialog() {
+  const name = convertedGroup();
+  const src = name && S.sources.get(name);
+  if (!src) return toast("元のモデルが残っていません。もう一度ひらいて変換してください", "err");
+  const conf = S.groups.get(name).conf;
+  CV.size = conf.scaleMode === "SIZE" ? conf.size : S.convSize;
+  $("cv-hollow").checked = !!conf.hollow;
+  $("cv-basic").checked = !!conf.basicColors;
+  $("cv-bu").checked = !!conf.bottomUpOnly;
+  $("cv-unify").checked = conf.height && conf.height !== "MIXED";
+  if ($("cv-unify").checked) $("cv-unify-to").value = conf.height;
+  const allowed = conf.allowed ? new Set(conf.allowed) : null;
+  for (const c of $$("#cv-parts input[data-part]")) c.checked = !allowed || allowed.has(c.dataset.part);
+  CV.sync(); CV.markPreset();
+  openConvertDialog({ root: src.root, ext: src.ext, name: conf.name || name }, name);
 }
 
 // ---------------------------------------------------------------- ファイルをひらく
@@ -3948,6 +4101,7 @@ function wire() {
   $("reconv-bu").onchange = (e) => { S.convBottomUp = e.target.checked; };
   $("opt-source").onchange = (e) => { S.showSource = e.target.checked; rebuildOverlay(); refreshHud(); };
   $("btn-reconvert").onclick = reconvert;
+  $("btn-reconvert-full").onclick = openReconvertDialog;
   // 部品表
   $("btn-csv").onclick = () => {
     if (!S.parts.length) return toast("パーツがありません", "warn");
