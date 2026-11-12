@@ -2478,6 +2478,60 @@ function refreshPlayButton() {
   $("btn-play").textContent = S.playing ? "❚❚ 止める" : "▶ 自動で組み立てる";
 }
 
+// ---------------------------------------------------------------- 元のモデルの保存 (IndexedDB)
+// 変換に使った元の 3D モデルは大きいので localStorage ではなく IndexedDB に置く。使えない環境では何もしない
+function idbOpen() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("pocchi-kobo", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("sources");
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  });
+}
+async function idbRun(mode, fn) {
+  try {
+    const db = await idbOpen();
+    return await new Promise((res, rej) => {
+      const tx = db.transaction("sources", mode), req = fn(tx.objectStore("sources"));
+      tx.oncomplete = () => res(req && req.result);
+      tx.onerror = () => rej(tx.error);
+    });
+  } catch { return undefined; }
+}
+const idbPut = (key, val) => idbRun("readwrite", (st) => st.put(val, key));
+const idbGet = (key) => idbRun("readonly", (st) => st.get(key));
+const idbKeys = () => idbRun("readonly", (st) => st.getAllKeys());
+const idbDelete = (key) => idbRun("readwrite", (st) => st.delete(key));
+async function syncSourceStore() {  // もう無い変換モデルの元データは消す
+  const keys = (await idbKeys()) || [];
+  for (const k of keys) if (!S.groups.has(k)) idbDelete(k);
+}
+let _restoring = false;
+// 開き直したとき: 変換モデルの元のモデルを読み戻して、作り直しや重ねて表示をできるようにする
+async function restoreSources() {
+  _restoring = true;
+  refreshConvert();
+  for (const [name, { conf }] of S.groups) {
+    if (S.sources.has(name)) continue;
+    try {
+      let rec = await idbGet(name);
+      // 前の版で変換したサンプルは、名前から読み戻す
+      if (!rec && conf.ext === ".glb" && SAMPLES[conf.name]) rec = { sample: conf.name };
+      if (!rec) continue;
+      const model = rec.sample
+        ? await loadModelBuffer(b64ToBuffer(SAMPLES[rec.sample].data), ".glb", rec.sample)
+        : await loadModelFiles(rec.files.map((f) => new File([f.buffer], f.name)));
+      const layerH = conf.height === "BRICK" ? BRICK_H : PLATE_H;
+      const { frame } = voxelizeModel(model.root, model.ext, { scaleMode: conf.scaleMode || "SIZE", size: conf.size,
+        hollow: !!conf.hollow, basicColors: !!conf.basicColors, layerH, keepSupport: !!(conf.hollow && conf.bottomUpOnly) });
+      S.sources.set(name, { root: model.root, ext: model.ext, frame });
+    } catch (e) { console.warn("元のモデルを読み戻せませんでした", name, e); }
+  }
+  _restoring = false;
+  refreshConvert();
+  rebuildOverlay();
+}
+
 // ---------------------------------------------------------------- 3D
 const canvas = $("view");
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: false });
@@ -2946,7 +3000,7 @@ function clearAll() {
   _clearArmed = 0;
   $("btn-clear").textContent = "すべてのパーツを消す";
   edit(() => { S.parts = []; S.sel.clear(); S.active = null; S.groups.clear(); });
-  S.sources.clear(); rebuildOverlay();
+  S.sources.clear(); rebuildOverlay(); syncSourceStore();
   toast(`すべて消しました${undoHint()}`);
 }
 
@@ -3692,7 +3746,13 @@ async function runConvert(opts = convertOptions(), model = CV.model, silent = fa
       S.sel.clear(); S.active = created.length ? created[0].id : null;
       S.groups.set(name, { conf: { ...opts, allowed: opts.allowed ? [...opts.allowed] : null, name: model.name, ext: model.ext, file: model.name + model.ext } });
     });
-    if (opts.keepSource) S.sources.set(name, { root: model.root, ext: model.ext, frame: res.frame });
+    if (opts.keepSource) {
+      S.sources.set(name, { root: model.root, ext: model.ext, frame: res.frame });
+      // ページを開き直しても作り直せるよう、元のモデルもこのブラウザに残す (サンプルは名前だけ)
+      if (model.sample) idbPut(name, { sample: model.sample });
+      else if (model.files) idbPut(name, { files: model.files });
+    }
+    syncSourceStore();
     S.lastName = model.name;
     const [sx, sy, sz] = res.info.studs;
     S.convSize = opts.scaleMode === "SIZE" ? opts.size
@@ -3738,7 +3798,8 @@ function refreshConvert() {
   ro.append(b, s);
   if (!S.sources.has(name)) {
     const w = document.createElement("span"); w.className = "warn";
-    w.textContent = "元のモデルが残っていないので作り直せません (もう一度ひらいてください)";
+    w.textContent = _restoring ? "元のモデルを読み込んでいます…"
+      : "元のモデルがこのブラウザに残っていないので作り直せません。同じファイルをもう一度ひらいて変換してください";
     ro.append(w);
   }
   if (!_reconvRes) _reconvRes = resolutionWidget($("reconv-res"), () => S.convSize, (v) => { S.convSize = v; }, "rc");
@@ -3813,6 +3874,9 @@ async function openFiles(files) {
     setBusy("3D モデルを読み込んでいます…");
     await nextFrame();
     const model = await loadModelFiles(files);
+    // 元のファイルの中身を覚えておく (作り直し用にブラウザへ残す。大きすぎるものは残さない)
+    const total = files.reduce((n, f) => n + f.size, 0);
+    if (total < 60 * 1024 * 1024) model.files = await Promise.all(files.map(async (f) => ({ name: f.name, buffer: await f.arrayBuffer() })));
     setBusy(null);
     openConvertDialog(model);
   } catch (e) {
@@ -3862,6 +3926,7 @@ async function openSample(key, direct = false) {
   await nextFrame();
   try {
     const model = await loadModelBuffer(b64ToBuffer(s.data), ".glb", key);
+    model.sample = key;
     setBusy(null);
     if (direct) {
       CV.size = 24;
@@ -4204,6 +4269,7 @@ async function start() {
     _thumbs = await renderPartImages(PARTS.map(([p]) => ({ part: p, color: 1, qty: 1 })), 112);
     renderShelf();
   } catch (e) { console.warn("thumbnails", e); }
+  if (restored) restoreSources();
   if (restored) {
     toast(`前回の続き (${S.parts.length} パーツ) を開きました。新しく始めるときは「つくる」の一番下の「すべてのパーツを消す」で`, "info", 9000);
   }
