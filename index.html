@@ -292,11 +292,24 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 .tool[aria-pressed="true"] { background: var(--sun); border-color: #16181B; color: #16181B; }
 .boxsel { position: absolute; border: 2px dashed var(--sel); background: rgb(255 138 0 / .12); pointer-events: none; z-index: 3; }
 /* つくるタブ: 道具はアイコンだけ、ほかの道具は名前の一覧。押すと作業台の上の引き出しに出る */
-.tools { grid-template-columns: repeat(6, 1fr); }
-.tool { padding: 6px 2px; }
-.tool .tl, .tool .kbd { display: none; }
-.tool .ti { font-size: 20px; }
-.tool-hint { font-size: 11px; }
+/* 道具のバー: つくるタブの間、作業台の上にずっと出す */
+.toolbar { display: none; position: absolute; top: 8px; left: 8px; right: 8px; max-width: 760px; margin: 0 auto; z-index: 6;
+  background: var(--paper); border-radius: 12px; box-shadow: var(--shadow); padding: 5px; align-items: center; gap: 10px; }
+.tab-build-on .toolbar { display: flex; }
+.toolbar .tools { display: flex; gap: 4px; flex: none; }
+.toolbar .tool { display: flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 9px; font-size: 12px; }
+.toolbar .tool .ti { font-size: 16px; }
+.toolbar .tool .kbd { display: none; }
+.toolbar .tool-hint { margin: 0; font-size: 11px; line-height: 1.35; min-width: 0; color: var(--muted); }
+/* バーが出ているときは、引き出しと左上の表示をその下へ */
+.tab-build-on .drawer { top: calc(var(--tb-h, 54px) + 16px); max-height: calc(100% - var(--tb-h, 54px) - 28px); }
+.tab-build-on .hud { top: calc(var(--tb-h, 54px) + 16px); }
+@media (max-width: 860px) {
+  .toolbar .tool .tl { display: none; }
+  .toolbar .tool { padding: 7px 10px; }
+  .toolbar .tools { flex: 1; justify-content: space-between; }
+  .toolbar .tool-hint { display: none; }
+}
 .items { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--line);
   background: var(--paper); font-weight: 700; cursor: pointer; text-align: left; min-width: 0; }
@@ -384,18 +397,6 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
       <div class="panels">
         <!-- つくる -->
         <section class="panel" id="tab-build" role="tabpanel" aria-labelledby="tabbtn-build">
-          <div class="sec">
-            <h3>道具</h3>
-            <div class="tools" role="group" aria-label="道具">
-              <button class="tool" type="button" data-tool="select" aria-pressed="true" title="選ぶ (V)" aria-label="選ぶ"><span class="ti">↖</span><span class="tl">選ぶ</span><span class="kbd">V</span></button>
-              <button class="tool" type="button" data-tool="box" aria-pressed="false" title="範囲で選ぶ (M)" aria-label="範囲で選ぶ"><span class="ti">⬚</span><span class="tl">範囲で選ぶ</span><span class="kbd">M</span></button>
-              <button class="tool" type="button" data-tool="place" aria-pressed="false" title="置く (P)" aria-label="置く"><span class="ti">＋</span><span class="tl">置く</span><span class="kbd">P</span></button>
-              <button class="tool" type="button" data-tool="paint" aria-pressed="false" title="塗る (B)" aria-label="塗る"><span class="ti">🖌</span><span class="tl">塗る</span><span class="kbd">B</span></button>
-              <button class="tool" type="button" data-tool="pick" aria-pressed="false" title="スポイト (I)" aria-label="スポイト"><span class="ti">💧</span><span class="tl">スポイト</span><span class="kbd">I</span></button>
-              <button class="tool" type="button" data-tool="erase" aria-pressed="false" title="消しゴム (E)" aria-label="消しゴム"><span class="ti">⌫</span><span class="tl">消しゴム</span><span class="kbd">E</span></button>
-            </div>
-            <p class="hint tool-hint" id="tool-hint">パーツをクリックして選びます。Shift+クリックで選択に足す・外す。</p>
-          </div>
           <div class="sec">
             <h3>ほかの道具 <small class="hint">押すと作業台の上に出ます</small></h3>
             <div class="items">
@@ -519,6 +520,17 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 
     <section class="stage" id="stage" aria-label="作業台">
       <canvas id="view"></canvas>
+      <div class="toolbar" id="toolbar" aria-label="道具">
+        <div class="tools" role="group" aria-label="道具">
+              <button class="tool" type="button" data-tool="select" aria-pressed="true" title="選ぶ (V)" aria-label="選ぶ"><span class="ti">↖</span><span class="tl">選ぶ</span><span class="kbd">V</span></button>
+              <button class="tool" type="button" data-tool="box" aria-pressed="false" title="範囲で選ぶ (M)" aria-label="範囲で選ぶ"><span class="ti">⬚</span><span class="tl">範囲で選ぶ</span><span class="kbd">M</span></button>
+              <button class="tool" type="button" data-tool="place" aria-pressed="false" title="置く (P)" aria-label="置く"><span class="ti">＋</span><span class="tl">置く</span><span class="kbd">P</span></button>
+              <button class="tool" type="button" data-tool="paint" aria-pressed="false" title="塗る (B)" aria-label="塗る"><span class="ti">🖌</span><span class="tl">塗る</span><span class="kbd">B</span></button>
+              <button class="tool" type="button" data-tool="pick" aria-pressed="false" title="スポイト (I)" aria-label="スポイト"><span class="ti">💧</span><span class="tl">スポイト</span><span class="kbd">I</span></button>
+              <button class="tool" type="button" data-tool="erase" aria-pressed="false" title="消しゴム (E)" aria-label="消しゴム"><span class="ti">⌫</span><span class="tl">消しゴム</span><span class="kbd">E</span></button>
+            </div>
+        <p class="hint tool-hint" id="tool-hint">パーツをクリックして選びます。Shift+クリックで選択に足す・外す。</p>
+      </div>
       <div class="drawer" id="drawer" hidden>
         <div class="drawer-head"><b id="drawer-title"></b><button class="btn x" id="drawer-close" type="button" aria-label="閉じる">×</button></div>
         <div class="drawer-body">
@@ -3557,6 +3569,10 @@ function closePane() {
   for (const b of $$("[data-open]")) b.setAttribute("aria-expanded", "false");
 }
 function setTool(t) {
+  // 道具を替えたら、その道具のために自動で開いた引き出しは閉じる (塗る → 色、置く → 置く・追加)
+  const was = S.tool;
+  if ((was === "paint" || was === "pick") && !(t === "paint" || t === "pick") && openPaneKey === "color") closePane();
+  if (was === "place" && t !== "place" && openPaneKey === "place") closePane();
   if (t !== "pick") S.prevTool = t;
   S.tool = t;
   for (const b of $$("[data-tool]")) b.setAttribute("aria-pressed", String(b.dataset.tool === t));
@@ -4754,6 +4770,9 @@ function selectTab(name) {
     $("tabbtn-" + t).setAttribute("aria-selected", String(t === name));
     $("tab-" + t).hidden = t !== name;
   }
+  document.body.classList.toggle("tab-build-on", name === "build");  // 道具のバーは、つくるタブの間だけ出す
+  _setTbH();
+  if (name !== "build") closePane();
   try { localStorage.setItem("pocchi-kobo-tab", name); } catch { /* 覚えなくても困らない */ }
   if (name === "list") renderList();
 }
@@ -4932,6 +4951,15 @@ function onKey(e) {
 }
 
 // ---------------------------------------------------------------- スマホ: 看板のボタンをスクロールで隠す
+// 道具のバーの高さ (文字の折り返しで変わる) を、引き出しと左上の表示の位置に使う
+function trackToolbarHeight() {
+  const tb = $("toolbar");
+  const set = () => $("stage").style.setProperty("--tb-h", tb.offsetHeight + "px");
+  new ResizeObserver(set).observe(tb);
+  set();
+  return set;
+}
+let _setTbH = () => {};
 function setupMobileHeader() {
   const head = document.querySelector(".top"), narrow = matchMedia("(max-width: 860px)");
   // 作業台を看板のすぐ下に貼り付けるため、看板の高さを CSS に渡す
@@ -4954,6 +4982,7 @@ async function start() {
   buildConvertDialog();
   wire();
   setupMobileHeader();
+  _setTbH = trackToolbarHeight();
   let tab = "build";
   try { tab = localStorage.getItem("pocchi-kobo-tab") || "build"; } catch { /* 既定のタブ */ }
   selectTab(["build", "order", "convert", "list"].includes(tab) ? tab : "build");
