@@ -284,6 +284,13 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 .quick { border: 1.5px solid var(--line); border-radius: var(--r); padding: 8px 12px; }
 .quick summary { cursor: pointer; font-weight: 700; }
 .quick[open] { display: grid; gap: 10px; }
+.tools { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.tool { display: grid; justify-items: center; gap: 2px; padding: 8px 4px; border-radius: 10px; border: 1.5px solid var(--line);
+  background: var(--paper); font-weight: 700; font-size: 12px; cursor: pointer; }
+.tool .ti { font-size: 18px; line-height: 1; }
+.tool .kbd { font-size: 10px; }
+.tool[aria-pressed="true"] { background: var(--sun); border-color: #16181B; color: #16181B; }
+.boxsel { position: absolute; border: 2px dashed var(--sel); background: rgb(255 138 0 / .12); pointer-events: none; z-index: 3; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; }
 .keys dt { text-align: right; }
 .keys dd { margin: 0; }
@@ -356,6 +363,18 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
         <!-- つくる -->
         <section class="panel" id="tab-build" role="tabpanel" aria-labelledby="tabbtn-build">
           <div class="sec">
+            <h3>道具</h3>
+            <div class="tools" role="group" aria-label="道具">
+              <button class="tool" type="button" data-tool="select" aria-pressed="true"><span class="ti">↖</span>選ぶ<span class="kbd">V</span></button>
+              <button class="tool" type="button" data-tool="box" aria-pressed="false"><span class="ti">⬚</span>範囲で選ぶ<span class="kbd">M</span></button>
+              <button class="tool" type="button" data-tool="place" aria-pressed="false"><span class="ti">＋</span>置く<span class="kbd">P</span></button>
+              <button class="tool" type="button" data-tool="paint" aria-pressed="false"><span class="ti">🖌</span>塗る<span class="kbd">B</span></button>
+              <button class="tool" type="button" data-tool="pick" aria-pressed="false"><span class="ti">💧</span>スポイト<span class="kbd">I</span></button>
+              <button class="tool" type="button" data-tool="erase" aria-pressed="false"><span class="ti">⌫</span>消しゴム<span class="kbd">E</span></button>
+            </div>
+            <p class="hint" id="tool-hint">パーツをクリックして選びます。Shift+クリックで選択に足す・外す。</p>
+          </div>
+          <div class="sec">
             <h3>部品をえらぶ</h3>
             <div class="shelf-head">
               <div class="seg" role="group" aria-label="部品の種類">
@@ -399,6 +418,27 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
               <button class="btn grow" id="btn-selall" type="button">全部選ぶ</button>
             </div>
             <p class="hint">マウスなら <span class="kbd">Shift+ドラッグ</span> でパーツをつかんで動かせます (Shift+クリックは選択に足す / 外す)。ほかのパーツや基礎板にはめり込みません。</p>
+          </div>
+          <div class="sec">
+            <h3>まとめて選ぶ</h3>
+            <div class="row">
+              <button class="btn grow" id="sel-color" type="button">同じ色を全部</button>
+              <button class="btn grow" id="sel-layer" type="button">この段を全部</button>
+            </div>
+            <div class="row">
+              <button class="btn grow" id="sel-connected" type="button">つながっているもの全部</button>
+              <button class="btn grow" id="sel-none" type="button">選択をやめる</button>
+            </div>
+            <p class="hint">選んでいるパーツ (オレンジの矢印) を基準にします。</p>
+          </div>
+          <div class="sec">
+            <h3>部品を変える</h3>
+            <button class="btn block" id="op-replace" type="button">選んだパーツを、上で選んでいる部品に置き換える</button>
+            <div class="row">
+              <button class="btn grow" id="op-split" type="button">細かく分ける (1x1 に)</button>
+              <button class="btn grow" id="op-merge" type="button">1 つにまとめる</button>
+            </div>
+            <p class="hint">「まとめる」は、選んだパーツのうち同じ色・同じ段で隣り合うものを、なるべく大きな部品に組み直します。</p>
           </div>
           <div class="sec">
             <h3>確認</h3>
@@ -498,6 +538,7 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
       <canvas id="view"></canvas>
       <div class="hud" id="hud"></div>
       <div class="chip mode dragchip" id="hud-drag" aria-live="polite"></div>
+      <div class="boxsel" id="boxsel" hidden></div>
       <div class="placebar" id="placebar" hidden><span id="placebar-text">クリックで置く</span><button class="btn" id="ghost-rot" type="button">回す (R)</button><button class="btn" id="place-off" type="button">やめる</button></div>
       <div class="views">
         <button class="btn" data-view="fit" type="button">全体を見る (F)</button>
@@ -556,6 +597,15 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
         <label class="check"><input type="checkbox" id="cv-hollow"><span>中を空ける (表面だけ) <small class="hint">パーツ数を減らす。外から見た形は同じ</small></span></label>
         <label class="check"><input type="checkbox" id="cv-basic"><span>色メニューの 13 色だけ使う <small class="hint">オフなら、今売られている主な 40 色から近い色を選ぶ</small></span></label>
         <label class="check"><input type="checkbox" id="cv-bu"><span>下から積めるパーツだけにする <small class="hint">上の部品の下側に付けるしかないパーツを入れない。形の下側が少し欠ける</small></span></label>
+        <label class="check"><input type="checkbox" id="cv-sym"><span>左右対称にそろえる <small class="hint" id="cv-sym-hint">形と部品の並べ方を鏡写しにする</small></span></label>
+        <select class="input" id="cv-sym-axis" aria-label="折り返す向き">
+          <option value="y">Y (奥行き) の真ん中で折り返す</option>
+          <option value="x">X (横) の真ん中で折り返す</option>
+        </select>
+        <div class="row"><label class="lbl" for="cv-smooth">なめらかにする</label>
+          <select class="input grow" id="cv-smooth"><option value="0">しない</option><option value="1">弱 (とげ・細い棒を削り、小さなくぼみを埋める)</option><option value="2">強 (1 マス厚の縁も削る)</option></select></div>
+        <label class="check"><input type="checkbox" id="cv-thin"><span>細い部分を太らせない <small class="hint">マスの真ん中がモデルの中にあるマスだけ埋める。細い所が消えることがある</small></span></label>
+        <p class="note">マス目は自動でモデルの真ん中にそろえます。本体から浮いたパーツは自動でつなぎ直し、つなげないものは作りません。</p>
         <p class="note" id="cv-both" hidden>両方オン: 表面を下から積めるよう、支えに要る中身は残します (中はほぼ空きません)</p>
       </div>
       <div class="box">
@@ -634,7 +684,8 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
         <dt><span class="kbd">クリック</span></dt><dd>パーツを選ぶ (Shift で追加)</dd>
         <dt><span class="kbd">ドラッグ</span></dt><dd>視点を回す (右ドラッグで移動、ホイールで拡大)</dd>
         <dt><span class="kbd">Shift+ドラッグ</span></dt><dd>パーツをつかんで動かす。行き先にある物の上に自動で乗る (透明な部品と点線で行き先を表示。Esc でやめる)</dd>
-        <dt><span class="kbd">P</span></dt><dd>クリックで置くモード</dd>
+        <dt><span class="kbd">V / M / P</span></dt><dd>道具: 選ぶ / 範囲で選ぶ / 置く</dd>
+        <dt><span class="kbd">B / I / E</span></dt><dd>道具: 塗る (なぞると続けて塗れる) / スポイト (パーツの色を拾う) / 消しゴム (なぞると続けて消せる)</dd>
         <dt><span class="kbd">矢印</span></dt><dd>選択を 1 ポッチ動かす (↑ = 奥)</dd>
         <dt><span class="kbd">Shift+↑ / Shift+↓</span></dt><dd>1 プレート上 / 下へ (PageUp / PageDown でも)</dd>
         <dt><span class="kbd">R</span></dt><dd>90° 回す</dd>
@@ -789,7 +840,7 @@ function boxParts(height, allowed) {
 function uses1x1(height, allowed) { return !allowed || allowed.has(ONE_BY_ONE[height]); }
 
 // 2D のマス集合 cells (ck のキー) を長方形パーツで埋める。戻り値 [[部品, 中心 i, 中心 j, 回転]]
-function packRectangles(cells, candidates, preferX = true, leftovers = null, supported = null) {
+function packRectangles(cells, candidates, preferX = true, leftovers = null, supported = null, mirror = null) {
   const free = new Set(cells);
   const placed = [];
   const N4 = [[1, 0], [-1, 0], [0, 1], [0, -1]];
@@ -799,6 +850,19 @@ function packRectangles(cells, candidates, preferX = true, leftovers = null, sup
     for (const [a, b] of N4) if (free.has(ck(i + a, j + b))) open++;
     const overhang = supported !== null && !supported.has(c);  // 真下に何もないマスを先に決める
     return preferX ? [overhang ? 0 : 1, open, j, i, i, j] : [overhang ? 0 : 1, open, i, j, i, j];
+  };
+  // 左右対称: 置くときは折り返した位置にも同じ部品を置く。折り返しと重なる置き方は、それ自体が対称なときだけ
+  const mirrorOf = (block) => {
+    if (!mirror) return null;
+    const m = block.map(mirror);
+    const own = new Set(block);
+    if (m.every((c) => own.has(c))) return [];  // それ自体が左右対称 (真ん中をまたぐ)
+    if (m.some((c) => own.has(c) || !free.has(c))) return undefined;  // 折り返しが置けない
+    return m;
+  };
+  const mirrorItem = (item, mblock) => {
+    const is = mblock.map(ci_), js = mblock.map(cj_);
+    return [item[0], (Math.min(...is) + Math.max(...is)) / 2, (Math.min(...js) + Math.max(...js)) / 2, item[3]];
   };
   const place = (i0, j0) => {
     let fallback = null;  // 支えに届かないときに置く、収まる中で最大のパーツ
@@ -819,17 +883,25 @@ function packRectangles(cells, candidates, preferX = true, leftovers = null, sup
               }
             }
             if (!ok) continue;
+            const mblock = mirrorOf(block);
+            if (mblock === undefined) continue;
             const item = [part, bi + (sx - 1) / 2, bj + (sy - 1) / 2, rot];
+            const extra = mblock && mblock.length ? [mirrorItem(item, mblock), mblock] : null;
             if (supported === null || block.some((c) => supported.has(c))) {
               for (const c of block) free.delete(c);
-              return [item, block];
+              if (extra) for (const c of extra[1]) free.delete(c);
+              return [item, block, extra];
             }
-            if (!fallback) fallback = [item, block];
+            if (!fallback) fallback = [item, block, extra];
           }
         }
       }
     }
-    if (fallback) { for (const c of fallback[1]) free.delete(c); return fallback; }
+    if (fallback) {
+      for (const c of fallback[1]) free.delete(c);
+      if (fallback[2]) for (const c of fallback[2][1]) free.delete(c);
+      return fallback;
+    }
     if (leftovers === null) throw new Error("no candidate fits (1x1 missing from candidates?)");
     free.delete(ck(i0, j0));
     leftovers.push([i0, j0]);
@@ -840,9 +912,10 @@ function packRectangles(cells, candidates, preferX = true, leftovers = null, sup
   while (heap.size) {
     const [key, c] = heap.pop();
     if (!free.has(c) || cmpArr(key, keyOf(c)) !== 0) continue;
-    const [item, block] = place(ci_(c), cj_(c));
+    const [item, block, extra] = place(ci_(c), cj_(c));
     if (item) placed.push(item);
-    for (const b of block) {
+    if (extra) placed.push(extra[0]);
+    for (const b of extra ? block.concat(extra[1]) : block) {
       const bi = ci_(b), bj = cj_(b);
       for (const [a, d] of N4) {
         const n = ck(bi + a, bj + d);
@@ -921,7 +994,13 @@ function voxLayers(vox) {
   }
   return byLayer;
 }
-function packLayers(vox, height, allowed = null, stats = null) {
+// mirror: {axis: 0 (i) | 1 (j), sum} 左右対称に並べる (i' = sum - i)。null なら今までどおり
+function mirrorFn(mirror) {
+  if (!mirror) return null;
+  return mirror.axis === 0 ? (c) => ck(mirror.sum - ci_(c), cj_(c)) : (c) => ck(ci_(c), mirror.sum - cj_(c));
+}
+function packLayers(vox, height, allowed = null, stats = null, mirror = null) {
+  const mf = mirrorFn(mirror);
   const candidates = boxParts(height, allowed);
   const use1 = uses1x1(height, allowed);
   const byLayer = voxLayers(vox);
@@ -940,7 +1019,7 @@ function packLayers(vox, height, allowed = null, stats = null) {
     let leftovers = [];
     for (const color of [...byColor.keys()].sort((a, b) => a - b)) {
       const rest = use1 ? null : [];
-      for (const [part, ci, cj, rot] of packRectangles(byColor.get(color), candidates, k % 2 === 0, rest, supported)) {
+      for (const [part, ci, cj, rot] of packRectangles(byColor.get(color), candidates, k % 2 === 0, rest, supported, mf)) {
         parts.push([part, color, [ci * STUD, cj * STUD, top], rot]);
       }
       if (rest) leftovers = leftovers.concat(rest.map(([i, j]) => [i, j, color]));
@@ -955,7 +1034,8 @@ function packLayers(vox, height, allowed = null, stats = null) {
 }
 
 // ブリックとプレートを混ぜて埋める (ldraw_tools.pack_voxels と同じ)
-function packVoxels(vox, allowed = null, stats = null) {
+function packVoxels(vox, allowed = null, stats = null, mirror = null) {
+  const mf = mirrorFn(mirror);
   const bricks = boxParts(BRICK_H, allowed), plates = boxParts(PLATE_H, allowed);
   const bandH = BRICK_H / PLATE_H;
   const byLayer = voxLayers(vox);
@@ -981,7 +1061,7 @@ function packVoxels(vox, allowed = null, stats = null) {
       }
       const core = [...solid].filter((c) => !nearStep.has(c));
       const noBrick = uses1x1(BRICK_H, allowed) ? null : [];  // ブリックで埋まらないマスはプレートに回す
-      for (const [part, ci, cj, rot] of packRectangles(core, bricks, Math.floor(band / bandH) % 2 === 0, noBrick, below(band))) {
+      for (const [part, ci, cj, rot] of packRectangles(core, bricks, Math.floor(band / bandH) % 2 === 0, noBrick, below(band), mf)) {
         parts.push([part, color, [ci * STUD, cj * STUD, (band + bandH) * PLATE_H], rot]);
       }
       const skip = new Set((noBrick || []).map(([i, j]) => ck(i, j)));
@@ -994,7 +1074,7 @@ function packVoxels(vox, allowed = null, stats = null) {
         const rest = [];
         for (const [c, col] of cells.get(k)) if (col === color && !inBricks.has(k * KK * KK + c)) rest.push(c);
         const noPlate = uses1x1(PLATE_H, allowed) ? null : [];
-        for (const [part, ci, cj, rot] of packRectangles(rest, plates, k % 2 === 0, noPlate, below(k))) {
+        for (const [part, ci, cj, rot] of packRectangles(rest, plates, k % 2 === 0, noPlate, below(k), mf)) {
           parts.push([part, color, [ci * STUD, cj * STUD, topK], rot]);
         }
         if (noPlate) leftovers = leftovers.concat(noPlate.map(([i, j]) => [i, j, color]));
@@ -1096,6 +1176,162 @@ function buildSequence(parts) {
   for (const p of [...waiting].sort((a, b) => order.get(a) - order.get(b))) place(p, partBottom(p));
   return seq;
 }
+// ポッチでつながっているかたまり (大きい順)
+function partGroups(parts) {
+  const { links } = connections(parts);
+  const groups = [], seen = new Set();
+  for (const p of parts) {
+    if (seen.has(p)) continue;
+    const g = new Set([p]), st = [p];
+    while (st.length) for (const n of links.get(st.pop())) if (!g.has(n)) { g.add(n); st.push(n); }
+    for (const x of g) seen.add(x);
+    groups.push(g);
+  }
+  return groups.sort((a, b) => b.size - a.size);
+}
+function studCellsOf(p) {  // 箱型パーツの足元のマス [[i, j], ...] (ポッチ単位)
+  const [sx, sy] = footprint(p);
+  const i0 = Math.round(p.x / STUD - (sx - 1) / 2), j0 = Math.round(p.y / STUD - (sy - 1) / 2);
+  const out = [];
+  for (let a = 0; a < sx; a++) for (let b = 0; b < sy; b++) out.push([i0 + a, j0 + b]);
+  return out;
+}
+// 本体 (一番大きいかたまり) とつながっていないパーツをなくす。
+// 1. 浮いたパーツと、同じ段・同じ色・同じ高さで隣り合うパーツをまとめて組み直す。
+//    このとき、上か下に本体のパーツがあるマスにかかる置き方を優先する (= 本体にポッチでつながる)
+// 2. それでもつながらないものは作らない (removed に数を入れる)。mirror があれば左右対称のまま組み直す
+function _floatingCount(parts) {
+  const g = partGroups(parts);
+  return g.length > 1 ? parts.length - g[0].size : 0;
+}
+// 3. 小さな浮いたパーツ (4 マス以下) は、同じ段で隣り合う本体のパーツの色に塗り替えて、つなげる候補にする
+function _recolorSmallFloating(parts) {
+  const groups = partGroups(parts);
+  if (groups.length <= 1) return { parts, n: 0 };
+  const body = groups[0], owner = new Map();
+  for (const p of parts) for (const c of partCells(p)) owner.set(c, p);
+  let n = 0;
+  const out = parts.map((f) => {
+    if (body.has(f) || f.m || !PART_INFO.get(f.part) || PART_INFO.get(f.part).shape !== "box") return f;
+    const cells = studCellsOf(f);
+    if (cells.length > 4) return f;
+    const votes = new Map();
+    for (const [i, j] of cells) {
+      for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+        const o = owner.get(CELL_K(2 * (i + a), 2 * (j + b), f.z / PLATE_H - 1));
+        if (o && body.has(o) && o.z === f.z && partHeight(o.part) === partHeight(f.part)) votes.set(o.color, (votes.get(o.color) || 0) + 1);
+      }
+    }
+    if (!votes.size) return f;
+    const color = [...votes].sort((x, y) => y[1] - x[1] || x[0] - y[0])[0][0];
+    if (color === f.color) return f;
+    n++;
+    return { ...f, color };
+  });
+  return { parts: out, n };
+}
+// 本体 (一番大きいかたまり) とつながっていないパーツをなくす。順に試す:
+// 1. 浮いたパーツと、同じ段・同じ色・同じ高さで隣り合うパーツをまとめて組み直す (本体の上下にかかる置き方を優先)
+// 2. 左右対称のまま組めないところは、対称をあきらめて組み直す
+// 3. 小さな浮いたパーツは隣の本体の色に塗り替えて、もう一度組み直す
+// 4. それでもつながらないものは作らない (removed に数を入れる)
+function connectFloating(parts, allowed = null, mirror = null) {
+  const before = _floatingCount(parts);
+  if (!before) return { parts, fixed: 0, removed: 0, recolored: 0 };
+  parts = _connectPass(parts, allowed, mirror);
+  if (mirror && _floatingCount(parts)) parts = _connectPass(parts, allowed, null);
+  let recolored = 0;
+  for (let round = 0; round < 3 && _floatingCount(parts); round++) {
+    const r = _recolorSmallFloating(parts);
+    if (!r.n) break;
+    recolored += r.n;
+    parts = _connectPass(r.parts, allowed, null);
+  }
+  const groups = partGroups(parts);
+  let removed = 0;
+  if (groups.length > 1) {  // つながらなかったものは作らない (浮いたパーツは 1 つも残さない)
+    removed = parts.length - groups[0].size;
+    parts = parts.filter((p) => groups[0].has(p));
+  }
+  return { parts, fixed: before - Math.min(before, removed), removed, recolored };
+}
+function _connectPass(parts, allowed, mirror) {
+  const mf = mirrorFn(mirror);
+  let fixed = 0, stall = 0, lastFloating = Infinity;
+  const posKey = (p) => `${p.part}|${p.color}|${p.x}|${p.y}|${p.z}|${p.rot}`;
+  for (let iter = 0; iter < 40; iter++) {
+    const groups = partGroups(parts);
+    if (groups.length <= 1) break;
+    const body = groups[0];
+    const nFloating = parts.length - body.size;
+    if (nFloating >= lastFloating) { if (++stall >= 3) break; } else stall = 0;
+    lastFloating = nFloating;
+    const owner = new Map();
+    for (const p of parts) for (const c of partCells(p)) owner.set(c, p);
+    const byPos = new Map(parts.map((p) => [`${p.x}|${p.y}|${p.z}`, p]));
+    const done = new Set();
+    let changed = false;
+    const floating = parts.filter((p) => !body.has(p)).sort((a, b) => (a.z - b.z) || (a.x - b.x) || (a.y - b.y));
+    for (const f of floating) {
+      if (done.has(f)) continue;
+      const info = PART_INFO.get(f.part);
+      if (!info || info.shape !== "box" || f.m) continue;
+      const h = info.height;
+      // 同じ段・同じ色・同じ高さで隣り合うパーツを集める (多すぎないように)
+      const region = new Set([f]), queue = [f];
+      const sameLayer = (q) => q && !done.has(q) && !region.has(q) && q.z === f.z && q.color === f.color &&
+        PART_INFO.get(q.part) && PART_INFO.get(q.part).shape === "box" && PART_INFO.get(q.part).height === h && !q.m;
+      while (queue.length && region.size < 48) {
+        const q = queue.shift();
+        for (const [i, j] of studCellsOf(q)) {
+          for (const [a, b] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const o = owner.get(CELL_K(2 * (i + a), 2 * (j + b), f.z / PLATE_H - 1));
+            if (sameLayer(o)) { region.add(o); queue.push(o); }
+          }
+        }
+      }
+      if (mf) {  // 左右対称なら、折り返した側のパーツも一緒に組み直す
+        for (const q of [...region]) {
+          for (const [i, j] of studCellsOf(q)) {
+            const mc = mf(ck(i, j));
+            const o = owner.get(CELL_K(2 * ci_(mc), 2 * cj_(mc), f.z / PLATE_H - 1));
+            if (o && !region.has(o) && o.z === f.z && o.color === f.color && !o.m) region.add(o);
+          }
+        }
+      }
+      const cells = [], anchored = new Set();
+      const above = f.z / PLATE_H, below = (f.z - h) / PLATE_H - 1;
+      for (const q of region) {
+        for (const [i, j] of studCellsOf(q)) {
+          const c = ck(i, j);
+          cells.push(c);
+          for (const z of [above, below]) {
+            const o = owner.get(CELL_K(2 * i, 2 * j, z));
+            if (o && body.has(o) && !region.has(o)) anchored.add(c);
+          }
+        }
+      }
+      if (!anchored.size) continue;
+      const cand = boxParts(h, allowed);
+      if (!cand.length) continue;
+      const rest = uses1x1(h, allowed) ? null : [];
+      let placed;
+      try { placed = packRectangles(cells, cand, Math.round(f.z / h) % 2 === 0, rest, anchored, mf); } catch { continue; }
+      if (rest && rest.length) continue;  // 埋めきれない置き方は使わない
+      const made = placed.map(([part, ci, cj, rot]) => ({ part, color: f.color, x: ci * STUD, y: cj * STUD, z: f.z, rot }));
+      const before = new Set([...region].map(posKey));
+      if (made.length === region.size && made.every((m) => before.has(posKey(m)))) { for (const q of region) done.add(q); continue; }
+      for (const q of region) done.add(q);
+      parts = parts.filter((p) => !region.has(p)).concat(made);
+      for (const m of made) done.add(m);
+      fixed++;
+      changed = true;
+    }
+    if (!changed) break;
+  }
+  return parts;
+}
+
 // (重なっているパーツ, 本体から浮いているパーツ)
 function checkBuild(parts) {
   const owner = new Map(), overlapping = new Set();
@@ -1214,7 +1450,7 @@ if (typeof module !== "undefined") {
   module.exports = {
     STUD, PLATE_H, BRICK_H, PARTS, PART_INFO, partDims, partHeight, packRectangles, packLayers, packVoxels,
     fillLeftovers, boxParts, buildSequence, bottomUpBuildable, checkBuild, partCells, partBottom, ldrawText,
-    ldrawLine, parseLdr, countParts, csvText, pyRound, EXT_PARTS,
+    ldrawLine, parseLdr, countParts, csvText, pyRound, EXT_PARTS, connectFloating, partGroups,
   };
 }
 
@@ -1600,7 +1836,8 @@ function _cvBlockSize(meshes) {  // Minecraft のような立方体の集まり�
 // opts: {scaleMode: "SIZE"|"BLOCK"|"BLOCK_SMALL", size, hollow, basicColors, layerH, keepSupport}
 // 戻り値: {vox: Map("i,j,k" → 色番号), info, frame}
 function voxelizeModel(root, ext, opts) {
-  const o = Object.assign({ scaleMode: "SIZE", size: 24, hollow: false, basicColors: false, layerH: PLATE_H, keepSupport: false }, opts);
+  const o = Object.assign({ scaleMode: "SIZE", size: 24, hollow: false, basicColors: false, layerH: PLATE_H, keepSupport: false,
+    center: true, thin: false, smooth: 0, symmetry: null, shell: 1 }, opts);
   const meshes = _cvCollect(root, ext);
   if (!meshes.length) throw new Error("形 (メッシュ) がありません");
   const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
@@ -1623,6 +1860,10 @@ function voxelizeModel(root, ext, opts) {
   const toCell = [ldu[0] / STUD, ldu[1] / STUD, ldu[2] / o.layerH];
   const dims = [0, 1, 2].map((c) => Math.max(Math.ceil(extent[c] * toCell[c] - 1e-6), 1));
   const [nx, ny, nz] = dims;
+  // A: マス目の余りを左右 (前後) に半分ずつ振り分けて、モデルをマス目の真ん中に置く (底は 0 のまま)。
+  //    端から数えると余りが片側に寄り、片側だけ表面が隣のマスにかかって左右非対称になるため
+  const shift = [0, 0, 0];
+  if (o.center && !_CV_BLOCK_SCALES[o.scaleMode]) for (const c of [0, 1]) shift[c] = (dims[c] - extent[c] * toCell[c]) / 2;
 
   const { codes, nearest } = _cvPalette(o.basicColors);
   const nc = codes.length;
@@ -1633,7 +1874,7 @@ function voxelizeModel(root, ext, opts) {
     const { co, tris, triMat, mats, uv, vcol } = m;
     for (let t = 0, nt = tris.length / 3; t < nt; t++) {
       const vi = [tris[t * 3], tris[t * 3 + 1], tris[t * 3 + 2]];
-      for (let a = 0; a < 3; a++) for (let c = 0; c < 3; c++) q[a * 3 + c] = (co[vi[a] * 3 + c] - lo[c]) * toCell[c];
+      for (let a = 0; a < 3; a++) for (let c = 0; c < 3; c++) q[a * 3 + c] = (co[vi[a] * 3 + c] - lo[c]) * toCell[c] + shift[c];
       const el = (a, b) => { const dx = q[b * 3] - q[a * 3], dy = q[b * 3 + 1] - q[a * 3 + 1], dz = q[b * 3 + 2] - q[a * 3 + 2]; return Math.sqrt(dx * dx + dy * dy + dz * dz); };
       const e = Math.max(el(0, 1), el(1, 2), el(2, 0));
       const k = Math.min(Math.max(Math.ceil(e / _CV_SPACING), 1), _CV_MAX_STEPS);
@@ -1721,8 +1962,10 @@ function voxelizeModel(root, ext, opts) {
   let nSurface = 0;
   for (let i = 0; i < N; i++) if (grid[i] >= 0) { surface[i] = 1; nSurface++; }
   info.surface = nSurface;
+  // なめらかにする・左右対称・殻の厚みは、中身まで埋めた形に対して行う
+  const needSolid = o.smooth > 0 || o.symmetry || o.shell > 1 || o.thin;
 
-  if (!o.hollow || o.keepSupport) {  // 外側から塗りつぶし、届かなかったところを中身にする
+  if (!o.hollow || o.keepSupport || needSolid) {  // 外側から塗りつぶし、届かなかったところを中身にする
     const outside = new Uint8Array(N), stack = [];
     for (let x = 0; x < GX; x++) for (let y = 0; y < GY; y++) for (let z = 0; z < GZ; z++) {
       if (x === 0 || y === 0 || z === 0 || x === GX - 1 || y === GY - 1 || z === GZ - 1) {
@@ -1758,10 +2001,44 @@ function voxelizeModel(root, ext, opts) {
       }
       if (!filled) break;
     }
+    // 細い部分を太らせない: 中まで埋めてから、真ん中がモデルの外にあるマスを外す (先に外すと殻に穴があき、中が埋まらない)
+    if (o.thin) _cvThin(meshes, lo, toCell, shift, dims, grid);
+    if (o.smooth > 0) _cvSmooth(grid, GX, GY, GZ, o.smooth);
+    if (o.symmetry) _cvSymmetrize(grid, GX, GY, GZ, o.symmetry);
+    if (needSolid) {  // 形が変わったので、表面 (外に面したマス) を数え直す
+      nSurface = 0;
+      for (let i = 0; i < N; i++) {
+        surface[i] = 0;
+        if (grid[i] < 0) continue;
+        const z = i % GZ, y = Math.floor(i / GZ) % GY, x = Math.floor(i / S0);
+        const nbs = [i - S0, i + S0, i - S1, i + S1, i - 1, i + 1];
+        if (x === 0 || y === 0 || z === 0 || x === GX - 1 || y === GY - 1 || z === GZ - 1 || nbs.some((j) => grid[j] < 0)) {
+          surface[i] = 1; nSurface++;
+        }
+      }
+      info.surface = nSurface;
+    }
     let nAll = 0;
     for (let i = 0; i < N; i++) if (grid[i] >= 0) nAll++;
     info.inside = nAll - nSurface;
-    if (o.hollow) {  // keepSupport: 表面のマスの真下にある中身だけ、下の何かに届くまで柱として残す
+    if (o.hollow && o.shell > 1 && !o.keepSupport) {  // 殻を厚くする: 表面から shell マス以内の中身を残す
+      const dist = new Int32Array(N).fill(-1), q2 = [];
+      for (let i = 0; i < N; i++) if (surface[i]) { dist[i] = 1; q2.push(i); }
+      for (let h = 0; h < q2.length; h++) {
+        const i = q2[h];
+        if (dist[i] >= o.shell) continue;
+        for (const j of [i - S0, i + S0, i - S1, i + S1, i - 1, i + 1]) {
+          if (j >= 0 && j < N && grid[j] >= 0 && dist[j] < 0) { dist[j] = dist[i] + 1; q2.push(j); }
+        }
+      }
+      let kept = 0;
+      for (let i = 0; i < N; i++) if (grid[i] >= 0 && !surface[i]) { if (dist[i] > 0) kept++; else grid[i] = -1; }
+      info.inside = kept;
+    } else if (o.hollow && !o.keepSupport && needSolid) {  // 表面だけにする
+      for (let i = 0; i < N; i++) if (grid[i] >= 0 && !surface[i]) grid[i] = -1;
+      info.inside = 0;
+    }
+    if (o.hollow && o.keepSupport) {  // keepSupport: 表面のマスの真下にある中身だけ、下の何かに届くまで柱として残す
       const keep = new Uint8Array(N);
       let kept = 0;
       for (let x = 0; x < GX; x++) {
@@ -1785,8 +2062,134 @@ function voxelizeModel(root, ext, opts) {
     if (v >= 0) vox.set(`${x - 1 - ci},${y - 1 - cj},${z - 1}`, codes[v]);
   }
   info.studs = [nx, ny, nz];
-  const frame = { zup: _CV_ZUP.has(ext), lo, ldu, ci, cj, layerH: o.layerH };
+  const frame = { zup: _CV_ZUP.has(ext), lo, ldu, ci, cj, layerH: o.layerH, shift: [shift[0] * STUD, shift[1] * STUD] };
+  if (o.symmetry) info.mirror = { axis: o.symmetry === "x" ? 0 : 1, sum: o.symmetry === "x" ? nx - 1 - 2 * ci : ny - 1 - 2 * cj };
   return { vox, info, frame };
+}
+
+// ---- D: 細い部分を太らせない。マスの真ん中がモデルの中にある (上へのばした線が面を奇数回横切る) マスだけ残す
+function _cvThin(meshes, lo, toCell, shift, dims, grid) {
+  const [nx, ny, nz] = dims, GY = ny + 2, GZ = nz + 2, S0 = GY * GZ;
+  const cols = new Map();  // 柱 (ix, iy) → 横切る高さのリスト
+  for (const m of meshes) {
+    const { co, tris } = m;
+    for (let t = 0; t < tris.length; t += 3) {
+      const P = [0, 1, 2].map((a) => [0, 1, 2].map((c) => (co[tris[t + a] * 3 + c] - lo[c]) * toCell[c] + shift[c]));
+      const x0 = Math.floor(Math.min(P[0][0], P[1][0], P[2][0]) - 0.5), x1 = Math.ceil(Math.max(P[0][0], P[1][0], P[2][0]) - 0.5);
+      const y0 = Math.floor(Math.min(P[0][1], P[1][1], P[2][1]) - 0.5), y1 = Math.ceil(Math.max(P[0][1], P[1][1], P[2][1]) - 0.5);
+      for (let ix = Math.max(x0, 0); ix <= Math.min(x1, nx - 1); ix++) {
+        for (let iy = Math.max(y0, 0); iy <= Math.min(y1, ny - 1); iy++) {
+          const px = ix + 0.5, py = iy + 0.5;
+          const [a, b, c] = P;
+          const d = (b[1] - c[1]) * (a[0] - c[0]) + (c[0] - b[0]) * (a[1] - c[1]);
+          if (Math.abs(d) < 1e-12) continue;
+          const l1 = ((b[1] - c[1]) * (px - c[0]) + (c[0] - b[0]) * (py - c[1])) / d;
+          const l2 = ((c[1] - a[1]) * (px - c[0]) + (a[0] - c[0]) * (py - c[1])) / d;
+          const l3 = 1 - l1 - l2;
+          if (l1 < 0 || l2 < 0 || l3 < 0) continue;
+          const z = l1 * a[2] + l2 * b[2] + l3 * c[2];
+          const k = ix * ny + iy;
+          if (!cols.has(k)) cols.set(k, []);
+          cols.get(k).push(z);
+        }
+      }
+    }
+  }
+  const inside = (ix, iy, z) => {
+    const list = cols.get(ix * ny + iy);
+    if (!list) return false;
+    let n = 0;
+    for (const v of list) if (v > z) n++;
+    return n % 2 === 1;
+  };
+  const drop = [];
+  for (let x = 1; x <= nx; x++) for (let y = 1; y <= ny; y++) for (let z = 1; z <= nz; z++) {
+    const i = x * S0 + y * GZ + z;
+    if (grid[i] < 0) continue;
+    // 外に面したマスだけ調べる (中のマスはそのまま。重なった部品で数え方が狂っても中は消さない)
+    const exposed = [i - S0, i + S0, i - GZ, i + GZ, i - 1, i + 1].some((j) => grid[j] < 0);
+    if (exposed && !inside(x - 1, y - 1, z - 0.5)) drop.push(i);  // 真ん中が外にある表面のマスは埋めない
+  }
+  for (const i of drop) grid[i] = -1;
+}
+
+// ---- D: なめらかにする。level 1: とげ・1 マス幅の棒を削り、5 方向が埋まったくぼみを埋める。
+//         level 2: さらに 1 マス厚の縁を削り、4 方向が埋まったくぼみも埋める
+function _cvSmooth(grid, GX, GY, GZ, level) {
+  const S0 = GY * GZ, S1 = GZ, N = grid.length;
+  for (let pass = 0; pass < level; pass++) {
+    const remove = [], add = [];
+    for (let x = 1; x < GX - 1; x++) for (let y = 1; y < GY - 1; y++) for (let z = 1; z < GZ - 1; z++) {
+      const i = x * S0 + y * S1 + z;
+      const ax = [[i - S0, i + S0], [i - S1, i + S1], [i - 1, i + 1]];
+      const occ = ax.map(([a, b]) => [grid[a] >= 0, grid[b] >= 0]);
+      const n = occ.reduce((s, [a, b]) => s + a + b, 0);
+      if (grid[i] >= 0) {
+        if (z === 1) continue;  // 地面に着いている段は削らない
+        const thinAxes = occ.filter(([a, b]) => !a && !b).length;
+        if (n <= 1 || thinAxes >= 2 || (level >= 2 && thinAxes >= 1 && n <= 3)) remove.push(i);
+      } else if (n >= (level >= 2 ? 4 : 5)) {
+        const votes = new Map();
+        for (const [a, b] of ax) for (const j of [a, b]) if (grid[j] >= 0) votes.set(grid[j], (votes.get(grid[j]) || 0) + 1);
+        add.push([i, [...votes].sort((p, q) => q[1] - p[1] || p[0] - q[0])[0][0]]);
+      }
+    }
+    for (const i of remove) grid[i] = -1;
+    for (const [i, c] of add) grid[i] = c;
+    if (!remove.length && !add.length) break;
+  }
+}
+
+// ---- C: 左右対称にそろえる。片側 (番号の小さい側) を基準に、どちらかにあれば両側に置き、色は基準側の色にする
+function _cvSymmetrize(grid, GX, GY, GZ, axis) {
+  const S0 = GY * GZ, S1 = GZ;
+  for (let x = 0; x < GX; x++) for (let y = 0; y < GY; y++) for (let z = 0; z < GZ; z++) {
+    const mx = axis === "x" ? GX - 1 - x : x, my = axis === "y" ? GY - 1 - y : y;
+    if ((axis === "x" ? x : y) >= (axis === "x" ? mx : my)) continue;  // 基準側 (小さい側) だけ見る
+    const i = x * S0 + y * S1 + z, j = mx * S0 + my * S1 + z;
+    if (grid[i] >= 0 || grid[j] >= 0) {
+      const c = grid[i] >= 0 ? grid[i] : grid[j];
+      grid[i] = c; grid[j] = c;
+    }
+  }
+}
+
+// ---- C: 元のモデルが左右対称か調べる。{x: 一致率, y: 一致率, axis: "x" | "y" | null}
+function detectSymmetry(root, ext) {
+  const meshes = _cvCollect(root, ext);
+  const pts = [];
+  for (const m of meshes) for (let i = 0; i < m.co.length; i += 3) pts.push([m.co[i], m.co[i + 1], m.co[i + 2]]);
+  if (!pts.length) return { x: 0, y: 0, axis: null };
+  const lo = [0, 1, 2].map((c) => Math.min(...pts.map((p) => p[c]))), hi = [0, 1, 2].map((c) => Math.max(...pts.map((p) => p[c])));
+  const ext3 = Math.max(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]) || 1;
+  const cell = ext3 / 60, tol = ext3 * 0.02;
+  const key = (p) => `${Math.floor(p[0] / cell)},${Math.floor(p[1] / cell)},${Math.floor(p[2] / cell)}`;
+  const hash = new Map();
+  for (const p of pts) { const k = key(p); if (!hash.has(k)) hash.set(k, []); hash.get(k).push(p); }
+  const near = (q) => {
+    const bx = Math.floor(q[0] / cell), by = Math.floor(q[1] / cell), bz = Math.floor(q[2] / cell);
+    for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) {
+      for (const p of hash.get(`${bx + a},${by + b},${bz + c}`) || []) {
+        if (Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]) <= tol) return true;
+      }
+    }
+    return false;
+  };
+  const step = Math.max(1, Math.floor(pts.length / 4000));
+  const score = (c) => {
+    const mid = (lo[c] + hi[c]) / 2;
+    let hit = 0, n = 0;
+    for (let i = 0; i < pts.length; i += step) {
+      const q = pts[i].slice();
+      q[c] = 2 * mid - q[c];
+      n++;
+      if (near(q)) hit++;
+    }
+    return n ? hit / n : 0;
+  };
+  const sx = score(0), sy = score(1);
+  const best = sx >= sy ? "x" : "y";
+  return { x: sx, y: sy, axis: Math.max(sx, sy) >= 0.9 ? best : null };
 }
 
 // 元のモデル (root の world 座標、three) → 画面の座標 (three 単位 = 1 ポッチ) へ写す行列。
@@ -1798,8 +2201,8 @@ function sourceMatrix(frame) {
   const [lx, ly, lz] = frame.lo, [sx, sy, sz] = frame.ldu;
   // 内部 → LDU: x = (X - lo_x) * ldu_x - (ci + 0.5) * STUD、y も同じ (cj)、z = (Z - lo_z) * ldu_z (底面が 0)
   const T = new THREE.Matrix4().set(
-    sx, 0, 0, -lx * sx - (frame.ci + 0.5) * STUD,
-    0, sy, 0, -ly * sy - (frame.cj + 0.5) * STUD,
+    sx, 0, 0, -lx * sx - (frame.ci + 0.5) * STUD + ((frame.shift && frame.shift[0]) || 0),
+    0, sy, 0, -ly * sy - (frame.cj + 0.5) * STUD + ((frame.shift && frame.shift[1]) || 0),
     0, 0, sz, -lz * sz,
     0, 0, 0, 1);
   const D = new THREE.Matrix4().set(U, 0, 0, 0, 0, 0, U, 0, 0, -U, 0, 0, 0, 0, 0, 1);  // LDU → three
@@ -1812,18 +2215,36 @@ function convertModel(root, ext, opts) {
   const layerH = _CV_LAYER_HEIGHTS[height];
   // 中を空けて下から積むには、空洞の上の殻を支える中身が要る
   const keepSupport = !!(opts.hollow && opts.bottomUpOnly);
-  const { vox, info, frame } = voxelizeModel(root, ext, { ...opts, layerH, keepSupport });
-  const stats = { bulge: 0, hidden_gap: 0, open_gap: 0 };
   const allowed = opts.allowed || null;
-  const packed = height === "MIXED" ? packVoxels(vox, allowed, stats) : packLayers(vox, layerH, allowed, stats);
-  let parts = packed.map(([part, color, [x, y, z], rot]) => ({ part, color, x, y, z, rot }));
+  // B: 浮いたパーツが残るときは、中を空けたモデルなら殻を 1 マスずつ厚くして組み直す (中なので見た目は同じ)
+  let shell = 1, vox, info, frame, stats, parts, conn, hollow = !!opts.hollow, hollowFallback = false;
+  for (;;) {
+    ({ vox, info, frame } = voxelizeModel(root, ext, { ...opts, hollow, layerH, keepSupport, shell }));
+    stats = { bulge: 0, hidden_gap: 0, open_gap: 0 };
+    const packed = height === "MIXED" ? packVoxels(vox, allowed, stats, info.mirror || null)
+      : packLayers(vox, layerH, allowed, stats, info.mirror || null);
+    parts = packed.map(([part, color, [x, y, z], rot]) => ({ part, color, x, y, z, rot }));
+    const before = parts.length - (partGroups(parts)[0] || new Set()).size;
+    conn = connectFloating(parts, allowed, info.mirror || null);
+    conn.before = before;
+    if (!conn.removed || !hollow || keepSupport) break;
+    if (shell >= 3) { hollow = false; hollowFallback = true; shell = 1; continue; }  // 中を空けるとつながらない: 中を埋める
+    shell++;
+  }
+  parts = conn.parts;
+  stats.floating_before = conn.before;
+  stats.floating_fixed = conn.before - conn.removed;
+  stats.floating_removed = conn.removed;
+  stats.shell = shell;
+  stats.floating_recolored = conn.recolored || 0;
+  stats.hollow_fallback = hollowFallback;
   let unbuildable = 0;
   if (opts.bottomUpOnly) {
     const keep = bottomUpBuildable(parts);
     unbuildable = parts.length - keep.size;
     parts = parts.filter((p) => keep.has(p));
   }
-  const colors = [...new Set(vox.values())].sort((a, b) => a - b);
+  const colors = [...new Set(parts.map((p) => p.color))].sort((a, b) => a - b);
   return { parts, info: { ...info, ...stats, unbuildable, voxels: vox.size, colors }, frame };
 }
 
@@ -2310,6 +2731,7 @@ const S = {
   sel: new Set(), active: null,
   partChoice: "3001.dat", ext: null, color: 4, stack: true,
   placing: false, ghostRot: 0,
+  tool: "select", prevTool: "select",  // 選ぶ / 範囲で選ぶ / 置く / 塗る / スポイト / 消しゴム
   baseplate: true, baseSize: 48,
   layer: 0, piece: 0, playing: false, interval: 0.15,
   groups: new Map(),     // 変換したモデル: 名前 → {conf}
@@ -3074,7 +3496,26 @@ function placeGhost() {
     S.sel = new Set([p.id]); S.active = p.id;
   });
 }
+const TOOL_HINTS = {
+  select: "パーツをクリックして選びます。Shift+クリックで選択に足す・外す。Shift+ドラッグでつかんで動かす。",
+  box: "ドラッグで四角く囲んだパーツを選びます (Ctrl を押しながらで、今の選択に足す)。",
+  place: "部品と色を選んで、基礎板やパーツの上をクリックすると置けます。R で回す。",
+  paint: "パーツをクリック (なぞる) と、選んでいる色に塗ります。何もない所をドラッグすると視点が回ります。",
+  pick: "パーツをクリックすると、その色を拾って、前の道具に戻ります。",
+  erase: "パーツをクリック (なぞる) と消します。Ctrl+Z で戻せます。",
+};
+function setTool(t) {
+  if (t !== "pick") S.prevTool = t;
+  S.tool = t;
+  for (const b of $$("[data-tool]")) b.setAttribute("aria-pressed", String(b.dataset.tool === t));
+  $("tool-hint").textContent = TOOL_HINTS[t];
+  if ((t === "place") !== S.placing) setPlacingRaw(t === "place");
+  refreshHud();
+}
 function setPlacing(on) {
+  setTool(on ? "place" : "select");
+}
+function setPlacingRaw(on) {
   S.placing = on;
   $("btn-place").classList.toggle("on", on);
   $("place-label").textContent = on ? "置くモード中 (Esc でやめる)" : "クリックで置くモード";
@@ -3222,6 +3663,171 @@ canvas.addEventListener("pointerup", (ev) => {
   }
 }, { capture: true });
 
+// ---- 塗る・消しゴム (なぞると続けて) / スポイト / 範囲で選ぶ
+const STROKE = { on: false, n: 0 };
+let BOX = null;
+function strokeAt(ev) {
+  setPointer(ev);
+  const got = pickPart();
+  if (!got) return;
+  const p = got.part;
+  if (S.tool === "paint") {
+    if (p.color === S.color) return;
+    p.color = S.color;
+  } else {
+    S.parts = S.parts.filter((q) => q !== p);
+    S.sel.delete(p.id);
+    if (S.active === p.id) S.active = null;
+  }
+  STROKE.n++;
+  rebuildParts();
+}
+canvas.addEventListener("pointerdown", (ev) => {
+  if (ev.button !== 0 || ev.shiftKey) return;
+  const t = S.tool;
+  if (t === "paint" || t === "erase") {
+    setPointer(ev);
+    if (!pickPart()) return;  // 何もない所: ふつうの視点操作
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    undoStack.push(snapshot()); redoStack.length = 0;
+    STROKE.on = true; STROKE.n = 0;
+    controls.enabled = false;
+    canvas.setPointerCapture(ev.pointerId);
+    strokeAt(ev);
+  } else if (t === "pick") {
+    setPointer(ev);
+    const got = pickPart();
+    if (!got) return;
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    S.color = got.part.color;
+    renderSwatches(); saveLocal();
+    toast(`色を拾いました: ${colorInfo(S.color)[0].replace(/_/g, " ")} (${S.color})`, "info", 2500);
+    setTool(S.prevTool && S.prevTool !== "pick" ? S.prevTool : "paint");
+  } else if (t === "box") {
+    ev.preventDefault(); ev.stopImmediatePropagation();
+    const r = $("stage").getBoundingClientRect();
+    BOX = { x0: ev.clientX - r.left, y0: ev.clientY - r.top, add: ev.ctrlKey || ev.metaKey };
+    controls.enabled = false;
+    canvas.setPointerCapture(ev.pointerId);
+  }
+}, { capture: true });
+canvas.addEventListener("pointermove", (ev) => {
+  if (STROKE.on) { ev.stopImmediatePropagation(); strokeAt(ev); return; }
+  if (BOX) {
+    ev.stopImmediatePropagation();
+    const r = $("stage").getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top, el = $("boxsel");
+    Object.assign(el.style, { left: Math.min(x, BOX.x0) + "px", top: Math.min(y, BOX.y0) + "px",
+      width: Math.abs(x - BOX.x0) + "px", height: Math.abs(y - BOX.y0) + "px" });
+    el.hidden = false;
+  }
+}, { capture: true });
+canvas.addEventListener("pointerup", (ev) => {
+  if (STROKE.on) {
+    ev.stopImmediatePropagation();
+    STROKE.on = false;
+    controls.enabled = true;
+    if (!STROKE.n) undoStack.pop(); else changed(S.tool === "erase");
+    return;
+  }
+  if (BOX) {
+    ev.stopImmediatePropagation();
+    const r = $("stage").getBoundingClientRect(), x1 = ev.clientX - r.left, y1 = ev.clientY - r.top;
+    const [ax, bx] = [Math.min(x1, BOX.x0), Math.max(x1, BOX.x0)], [ay, by] = [Math.min(y1, BOX.y0), Math.max(y1, BOX.y0)];
+    const vis = previewParts();
+    const hit = S.parts.filter((p) => {
+      if (vis && !vis.has(p)) return false;
+      const v = toThree(p.x, p.y, p.z - partHeight(p.part) / 2).project(camera);
+      const sx = (v.x + 1) / 2 * r.width, sy = (1 - v.y) / 2 * r.height;
+      return v.z < 1 && sx >= ax && sx <= bx && sy >= ay && sy <= by;
+    });
+    if (!BOX.add) S.sel.clear();
+    for (const p of hit) S.sel.add(p.id);
+    S.active = hit.length ? hit[hit.length - 1].id : S.active;
+    BOX = null;
+    $("boxsel").hidden = true;
+    controls.enabled = true;
+    refreshView(); refreshStatus(); refreshConvert();
+    toast(`${hit.length} 個選びました`, "info", 2000);
+  }
+}, { capture: true });
+
+// ---- まとめて選ぶ
+function selectionBase() {
+  const a = byId(S.active);
+  return a && S.sel.has(a.id) ? a : selectedParts()[0];
+}
+function selectWhere(pred, what) {
+  const base = selectionBase();
+  if (!base) return toast("基準にするパーツを 1 つ選んでください", "warn");
+  const list = S.parts.filter((p) => pred(p, base));
+  S.sel = new Set(list.map((p) => p.id)); S.active = base.id;
+  refreshView(); refreshStatus();
+  toast(`${what}: ${list.length} 個選びました`, "info", 2500);
+}
+function selectConnected() {
+  const base = selectionBase();
+  if (!base) return toast("基準にするパーツを 1 つ選んでください", "warn");
+  const g = partGroups(S.parts).find((x) => x.has(base));
+  S.sel = new Set([...g].map((p) => p.id)); S.active = base.id;
+  refreshView(); refreshStatus();
+  toast(`つながっているもの: ${g.size} 個選びました`, "info", 2500);
+}
+
+// ---- 部品を変える
+function replaceSelected() {
+  const parts = selectedParts().filter((p) => !p.m);
+  if (!parts.length) return toast("パーツが選ばれていません", "warn");
+  const part = currentPart();
+  const moved = parts.map((p) => { const q = { ...p, part, z: partBottom(p) + partHeight(part) }; snapPart(q); return q; });
+  const reason = blocked(moved, S.sel);
+  if (reason) return toast(reason === "ground" ? "基礎板より下になるので置き換えられません" : "置き換えると、ほかのパーツに当たります", "warn", 3500);
+  edit(() => { parts.forEach((p, i) => Object.assign(p, moved[i])); });
+  toast(`${parts.length} 個を ${partName(part)} に置き換えました`, "info", 2500);
+}
+function splitSelected() {
+  const parts = selectedParts().filter((p) => !p.m && PART_INFO.get(p.part) && PART_INFO.get(p.part).shape === "box" && ONE_BY_ONE[partHeight(p.part)]);
+  if (!parts.length) return toast("分けられるパーツ (箱型のブリック・プレート) が選ばれていません", "warn");
+  let made = [];
+  edit(() => {
+    for (const p of parts) {
+      const one = ONE_BY_ONE[partHeight(p.part)];
+      for (const [i, j] of studCellsOf(p)) made.push(newPart(one, p.color, i * STUD, j * STUD, p.z, 0, p.group));
+    }
+    const gone = new Set(parts);
+    S.parts = S.parts.filter((p) => !gone.has(p)).concat(made);
+    S.sel = new Set(made.map((p) => p.id)); S.active = made.length ? made[0].id : null;
+  });
+  toast(`${parts.length} 個を 1x1 の ${made.length} 個に分けました`, "info", 2500);
+}
+function mergeSelected() {
+  const parts = selectedParts().filter((p) => !p.m && PART_INFO.get(p.part) && PART_INFO.get(p.part).shape === "box");
+  const groups = new Map();  // 同じ色・同じ段・同じ高さ
+  for (const p of parts) {
+    const k = `${p.color}|${p.z}|${partHeight(p.part)}`;
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(p);
+  }
+  const plan = [];
+  for (const [k, list] of groups) {
+    if (list.length < 2) continue;
+    const [color, z, h] = k.split("|").map(Number);
+    const cells = list.flatMap((p) => studCellsOf(p).map(([i, j]) => ck(i, j)));
+    const placed = packRectangles(cells, boxParts(h, null), Math.round(z / h) % 2 === 0);
+    if (placed.length >= list.length) continue;  // 減らないなら変えない
+    plan.push([list, placed.map(([part, ci, cj, rot]) => newPart(part, color, ci * STUD, cj * STUD, z, rot, list[0].group))]);
+  }
+  if (!plan.length) return toast("まとめられるパーツがありません (同じ色・同じ段で隣り合うパーツを 2 つ以上選んでください)", "warn", 4000);
+  let before = 0, after = 0;
+  edit(() => {
+    const gone = new Set(plan.flatMap(([l]) => l));
+    const made = plan.flatMap(([, m]) => m);
+    before = gone.size; after = made.length;
+    S.parts = S.parts.filter((p) => !gone.has(p)).concat(made);
+    S.sel = new Set(made.map((p) => p.id)); S.active = made.length ? made[0].id : null;
+  });
+  toast(`${before} 個を ${after} 個にまとめました`, "info", 2500);
+}
+
 let _down = null;
 canvas.addEventListener("pointerdown", (ev) => { _down = { x: ev.clientX, y: ev.clientY, b: ev.button }; });
 canvas.addEventListener("pointermove", (ev) => { if (S.placing && !(ev.buttons & 1)) updateGhost(ev); });
@@ -3262,6 +3868,7 @@ function refreshHud() {
   hud.textContent = "";
   const chip = (text, cls = "") => { const c = document.createElement("span"); c.className = "chip " + cls; c.textContent = text; hud.append(c); };
   if (S.placing) chip(`置く: ${partName(currentPart())} / ${colorInfo(S.color)[0].replace(/_/g, " ")}`, "mode");
+  else if (S.tool !== "select") chip({ box: "範囲で選ぶ", paint: `塗る: ${colorInfo(S.color)[0].replace(/_/g, " ")}`, pick: "スポイト", erase: "消しゴム" }[S.tool], "mode");
   const { levels } = steps();
   if (S.piece) chip(`${S.piece} / ${S.parts.length} 個目まで表示`);
   else if (S.layer) chip(`${S.layer} / ${levels.length} 段目まで表示`);
@@ -3487,6 +4094,7 @@ function buildConvertDialog() {
   // 設定を変えたら、変換後のプレビューを作り直す
   $("cv-form").addEventListener("change", (e) => {
     if (e.target.id === "pv-cut") { applyCut(); return; }
+    if (e.target.id === "cv-sym") $("cv-sym-axis").hidden = !e.target.checked;
     if (e.target.id === "cv-hollow" && e.target.checked && !$("pv-cut").checked) {  // 中を空けたら断面で見せる
       $("pv-cut").checked = true; applyCut();
     }
@@ -3520,7 +4128,7 @@ function openConvertDialog(model, group = null) {
 const PV = { ready: false, result: null, timer: 0, seq: 0 };
 function optsKey(o) {  // 変換の結果に効く設定だけ
   return JSON.stringify([o.scaleMode, o.size, o.hollow, o.basicColors, o.bottomUpOnly, o.height,
-    o.allowed ? [...o.allowed].sort() : null]);
+    o.allowed ? [...o.allowed].sort() : null, o.symmetry || null, o.smooth || 0, !!o.thin]);
 }
 function previewScene() {
   const sc = new THREE.Scene();
@@ -3586,6 +4194,19 @@ function showPreviewModel(model) {
     o.material = Array.isArray(o.material) ? list : list[0];
   });
   PV.src.add(clone);
+  // C: 左右対称か調べて、対称ならチェックを入れておく (作り直しのときは前の設定のまま)
+  try {
+    const sym = detectSymmetry(model.root, model.ext);
+    const pct = (v) => Math.round(v * 100);
+    $("cv-sym-hint").textContent = sym.axis
+      ? `このモデルは ${sym.axis.toUpperCase()} で左右対称と判定 (一致 ${pct(sym[sym.axis])}%)`
+      : `左右対称ではないと判定 (一致 X ${pct(sym.x)}% / Y ${pct(sym.y)}%)`;
+    if (!CV.group) {
+      $("cv-sym").checked = !!sym.axis;
+      $("cv-sym-axis").value = sym.axis || "y";
+    }
+  } catch (e) { $("cv-sym-hint").textContent = "形と部品の並べ方を鏡写しにする"; }
+  $("cv-sym-axis").hidden = !$("cv-sym").checked;
   PV.result = null;
   PV.last = null;
   $("pv-delta").textContent = "";
@@ -3672,6 +4293,11 @@ async function updatePreview() {
   const levels = new Set(res.parts.map((q) => roundTo(q.z - partHeight(q.part), 3))).size;
   let stats = `${res.parts.length} パーツ・${res.info.colors.length} 色・${levels} 段`;
   if (res.info.unbuildable) stats += `・下から積めない ${res.info.unbuildable} パーツを抜く${removed ? " (赤い半透明)" : ""}`;
+  if (res.info.floating_before) {
+    stats += `・浮いたパーツ ${res.info.floating_before} 個 → ${res.info.floating_fixed} 個つなぎ直し`;
+    if (res.info.floating_removed) stats += `、${res.info.floating_removed} 個は作らない`;
+  }
+  if (res.info.shell > 1) stats += `・つなぐため殻を ${res.info.shell} マス厚に`;
   $("pv-stats").textContent = stats;
   // 前の設定からの変化 (見た目で分かりにくい変化も数で伝える)
   const now = { n: res.parts.length, colors: res.info.colors.join(","), c: res.info.colors.length };
@@ -3703,6 +4329,7 @@ function convertOptions() {
   return {
     scaleMode: "SIZE", size: CV.size, hollow: $("cv-hollow").checked, basicColors: $("cv-basic").checked,
     keepSource: $("cv-keep").checked, bottomUpOnly: $("cv-bu").checked, height, replace: $("cv-replace").checked,
+    symmetry: $("cv-sym").checked ? $("cv-sym-axis").value : null, smooth: Number($("cv-smooth").value), thin: $("cv-thin").checked,
     allowed: allowed.size === CONVERT_PARTS.length ? null : allowed,
   };
 }
@@ -3720,6 +4347,8 @@ function convertReport(created, info) {
     msg += `。1x1 を使わず、${info.bulge || 0} マスはみ出して埋め、見えない中の ${info.hidden_gap || 0} マスは空けました`;
     if (info.open_gap) msg += ` (埋められずに表面にできた 1 ポッチのくぼみ ${info.open_gap} 個)`;
   }
+  if (info.floating_fixed) msg += `。浮いていた ${info.floating_fixed} 個をつなぎ直しました`;
+  if (info.floating_removed) msg += `。どうしてもつながらない ${info.floating_removed} 個は作りませんでした`;
   if (floating.size) msg += `。本体とつながっていないパーツが ${floating.size} 個あります (組み立てチェックで確認)`;
   return [floating.size ? "warn" : "info", msg];
 }
@@ -3826,7 +4455,8 @@ async function reconvertGroup(name, opts, ready = null) {
   try {
     const res = ready || convertModel(src.root, src.ext, opts);
     const keep = { hollow: opts.hollow, basicColors: opts.basicColors, height: opts.height, scaleMode: opts.scaleMode,
-      size: opts.size, bottomUpOnly: opts.bottomUpOnly, allowed: opts.allowed ? [...opts.allowed] : null };
+      size: opts.size, bottomUpOnly: opts.bottomUpOnly, allowed: opts.allowed ? [...opts.allowed] : null,
+      symmetry: opts.symmetry || null, smooth: opts.smooth || 0, thin: !!opts.thin };
     edit(() => {
       S.parts = S.parts.filter((p) => p.group !== name);
       const dx = conf.offsetX || 0;  // 横に並べて置いたモデルは同じ場所に作り直す
@@ -3856,6 +4486,10 @@ function openReconvertDialog() {
   $("cv-hollow").checked = !!conf.hollow;
   $("cv-basic").checked = !!conf.basicColors;
   $("cv-bu").checked = !!conf.bottomUpOnly;
+  $("cv-sym").checked = !!conf.symmetry;
+  $("cv-sym-axis").value = conf.symmetry || "y";
+  $("cv-smooth").value = String(conf.smooth || 0);
+  $("cv-thin").checked = !!conf.thin;
   $("cv-unify").checked = conf.height && conf.height !== "MIXED";
   if ($("cv-unify").checked) $("cv-unify-to").value = conf.height;
   const allowed = conf.allowed ? new Set(conf.allowed) : null;
@@ -4130,6 +4764,14 @@ function wire() {
   };
   $("xp-q").oninput = () => { clearTimeout(_xpTimer); _xpTimer = setTimeout(xpSearch, 150); };
   $("btn-place").onclick = () => setPlacing(!S.placing);
+  for (const b of $$("[data-tool]")) b.onclick = () => setTool(b.dataset.tool);
+  $("sel-color").onclick = () => selectWhere((p, b) => p.color === b.color, "同じ色");
+  $("sel-layer").onclick = () => selectWhere((p, b) => partBottom(p) === partBottom(b), "この段");
+  $("sel-connected").onclick = selectConnected;
+  $("sel-none").onclick = clearSelection;
+  $("op-replace").onclick = replaceSelected;
+  $("op-split").onclick = splitSelected;
+  $("op-merge").onclick = mergeSelected;
   $("place-off").onclick = () => setPlacing(false);
   $("ghost-rot").onclick = () => { S.ghostRot = (S.ghostRot + 90) % 360; };
   $("opt-stack").onchange = (e) => { S.stack = e.target.checked; };
@@ -4217,8 +4859,10 @@ function onKey(e) {
     return rotateSelected();
   }
   if (k === "Delete" || k === "Backspace") { handled(); return deleteSelected(); }
-  if (k === "Escape") { if (DRAG.on) return endDrag(false); if (S.placing) return setPlacing(false); return clearSelection(); }
+  if (k === "Escape") { if (DRAG.on) return endDrag(false); if (S.tool !== "select") return setTool("select"); return clearSelection(); }
   if (k === "p" || k === "P") return setPlacing(!S.placing);
+  const toolKeys = { v: "select", m: "box", b: "paint", i: "pick", e: "erase" };
+  if (toolKeys[k.toLowerCase()]) return setTool(toolKeys[k.toLowerCase()]);
   if (k === "c" || k === "C") return paintSelected();
   if (k === "f" || k === "F") return frameView();
   if (k === "[") return layerStep(-1);
@@ -4278,7 +4922,8 @@ async function start() {
 window.__pocchi = { S, steps, setLayer, setPiece, layerStep, pieceStep, togglePlay, runConvert, reconvert, openFiles, openSample,
   exportZip, checkParts, undo, redo, addPart, moveSelected, rotateSelected, deleteSelected, duplicateSelected, setPlacing,
   placeTarget: () => placeTarget(), updateGhost, placeGhost, frameView, renderList, previewParts, convertModel, JSZip,
-  DRAG, renderer, toScreen: (x, y, z) => {  // LDU の点 → 画面の座標 (テスト用)
+  DRAG, CV, renderer, detectSymmetry, voxelizeModel, setTool, selectWhere, selectConnected, replaceSelected, splitSelected,
+  mergeSelected, toScreen: (x, y, z) => {  // LDU の点 → 画面の座標 (テスト用)
     const v = toThree(x, y, z).project(camera), r = canvas.getBoundingClientRect();
     return [r.left + (v.x + 1) / 2 * r.width, r.top + (1 - v.y) / 2 * r.height];
   } };
