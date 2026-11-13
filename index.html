@@ -3578,7 +3578,6 @@ function setTool(t) {
   for (const b of $$("[data-tool]")) b.setAttribute("aria-pressed", String(b.dataset.tool === t));
   $("tool-hint").textContent = TOOL_HINTS[t];
   if ((t === "paint" || t === "pick") && openPaneKey !== "color") openPane("color", false);  // 塗るときは色を出しておく
-  if (t === "place" && !openPaneKey) openPane("place", false);
   if ((t === "place") !== S.placing) setPlacingRaw(t === "place");
   refreshHud();
 }
