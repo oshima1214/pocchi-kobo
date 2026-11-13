@@ -291,6 +291,28 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 .tool .kbd { font-size: 10px; }
 .tool[aria-pressed="true"] { background: var(--sun); border-color: #16181B; color: #16181B; }
 .boxsel { position: absolute; border: 2px dashed var(--sel); background: rgb(255 138 0 / .12); pointer-events: none; z-index: 3; }
+/* つくるタブ: 道具はアイコンだけ、ほかの道具は名前の一覧。押すと作業台の上の引き出しに出る */
+.tools { grid-template-columns: repeat(6, 1fr); }
+.tool { padding: 6px 2px; }
+.tool .tl, .tool .kbd { display: none; }
+.tool .ti { font-size: 20px; }
+.tool-hint { font-size: 11px; }
+.items { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; border: 1.5px solid var(--line);
+  background: var(--paper); font-weight: 700; cursor: pointer; text-align: left; min-width: 0; }
+.item .ii { width: 18px; text-align: center; font-size: 16px; }
+.item small { margin-left: auto; color: var(--muted); font-weight: 500; font-size: 10px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item[aria-expanded="true"] { background: var(--sun); border-color: #16181B; color: #16181B; }
+.drawer { position: absolute; top: 8px; left: 8px; right: 8px; max-width: 760px; margin: 0 auto; max-height: 58%; z-index: 5;
+  background: var(--paper); border-radius: 14px; box-shadow: var(--shadow); border-top: 5px solid var(--sun); display: grid;
+  grid-template-rows: auto 1fr; overflow: hidden; }
+.drawer-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 4px 14px; }
+.drawer-head b { font-family: var(--font-display); font-size: 15px; }
+.drawer-head .x { margin-left: auto; min-height: 32px; padding: 0 10px; }
+.drawer-body { overflow-y: auto; padding: 0 14px 14px; }
+.dpane { display: grid; gap: 10px; }
+.pane-sub { margin: 0; font-size: 12px; color: var(--muted); }
+.drawer-open .hud { display: none; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; }
 .keys dt { text-align: right; }
 .keys dd { margin: 0; }
@@ -365,20 +387,32 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
           <div class="sec">
             <h3>道具</h3>
             <div class="tools" role="group" aria-label="道具">
-              <button class="tool" type="button" data-tool="select" aria-pressed="true"><span class="ti">↖</span>選ぶ<span class="kbd">V</span></button>
-              <button class="tool" type="button" data-tool="box" aria-pressed="false"><span class="ti">⬚</span>範囲で選ぶ<span class="kbd">M</span></button>
-              <button class="tool" type="button" data-tool="place" aria-pressed="false"><span class="ti">＋</span>置く<span class="kbd">P</span></button>
-              <button class="tool" type="button" data-tool="paint" aria-pressed="false"><span class="ti">🖌</span>塗る<span class="kbd">B</span></button>
-              <button class="tool" type="button" data-tool="pick" aria-pressed="false"><span class="ti">💧</span>スポイト<span class="kbd">I</span></button>
-              <button class="tool" type="button" data-tool="erase" aria-pressed="false"><span class="ti">⌫</span>消しゴム<span class="kbd">E</span></button>
+              <button class="tool" type="button" data-tool="select" aria-pressed="true" title="選ぶ (V)" aria-label="選ぶ"><span class="ti">↖</span><span class="tl">選ぶ</span><span class="kbd">V</span></button>
+              <button class="tool" type="button" data-tool="box" aria-pressed="false" title="範囲で選ぶ (M)" aria-label="範囲で選ぶ"><span class="ti">⬚</span><span class="tl">範囲で選ぶ</span><span class="kbd">M</span></button>
+              <button class="tool" type="button" data-tool="place" aria-pressed="false" title="置く (P)" aria-label="置く"><span class="ti">＋</span><span class="tl">置く</span><span class="kbd">P</span></button>
+              <button class="tool" type="button" data-tool="paint" aria-pressed="false" title="塗る (B)" aria-label="塗る"><span class="ti">🖌</span><span class="tl">塗る</span><span class="kbd">B</span></button>
+              <button class="tool" type="button" data-tool="pick" aria-pressed="false" title="スポイト (I)" aria-label="スポイト"><span class="ti">💧</span><span class="tl">スポイト</span><span class="kbd">I</span></button>
+              <button class="tool" type="button" data-tool="erase" aria-pressed="false" title="消しゴム (E)" aria-label="消しゴム"><span class="ti">⌫</span><span class="tl">消しゴム</span><span class="kbd">E</span></button>
             </div>
-            <p class="hint" id="tool-hint">パーツをクリックして選びます。Shift+クリックで選択に足す・外す。</p>
+            <p class="hint tool-hint" id="tool-hint">パーツをクリックして選びます。Shift+クリックで選択に足す・外す。</p>
+          </div>
+          <div class="sec">
+            <h3>ほかの道具 <small class="hint">押すと作業台の上に出ます</small></h3>
+            <div class="items">
+              <button class="item" type="button" data-open="color" aria-expanded="false"><span class="dot" id="item-color-dot"></span><span>色</span><small id="item-color-name"></small></button>
+              <button class="item" type="button" data-open="place" aria-expanded="false"><span class="ii">＋</span><span>置く・追加</span></button>
+              <button class="item" type="button" data-open="select" aria-expanded="false"><span class="ii">☰</span><span>まとめて選ぶ</span></button>
+              <button class="item" type="button" data-open="change" aria-expanded="false"><span class="ii">⇄</span><span>部品を変える</span></button>
+              <button class="item" type="button" data-open="check" aria-expanded="false"><span class="ii">✓</span><span>確認</span></button>
+              <button class="item" type="button" data-open="stage" aria-expanded="false"><span class="ii">▦</span><span>作業台</span></button>
+            </div>
           </div>
           <div class="sec">
             <h3>部品をえらぶ</h3>
             <div class="shelf-head">
               <div class="seg" role="group" aria-label="部品の種類">
-                <button type="button" data-shelf="all" aria-pressed="true">すべて</button>
+                <button type="button" data-shelf="basic" aria-pressed="true">基本</button>
+                <button type="button" data-shelf="all" aria-pressed="false">すべて</button>
                 <button type="button" data-shelf="plate" aria-pressed="false">プレート</button>
                 <button type="button" data-shelf="brick" aria-pressed="false">ブリック</button>
               </div>
@@ -386,16 +420,6 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
             <div class="shelf" id="shelf"></div>
             <div class="ext-chip" id="ext-chip" hidden><span>拡張:</span><b id="ext-name"></b><button class="btn" id="ext-clear" type="button" title="拡張パーツの選択をやめる" aria-label="拡張パーツの選択をやめる">×</button></div>
             <button class="btn block" id="btn-ext" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4-4"/></svg>拡張パーツ (全部品から検索)</button>
-          </div>
-          <div class="sec">
-            <h3>色 <span class="color-name" id="color-name"></span></h3>
-            <div class="swatches" id="swatches"></div>
-          </div>
-          <div class="sec">
-            <h3>置く</h3>
-            <button class="btn block" id="btn-place" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3v18M3 12h18"/></svg><span id="place-label">クリックで置くモード</span><span class="kbd">P</span></button>
-            <label class="check"><input type="checkbox" id="opt-stack" checked><span>選択中のパーツの上に積む (「パーツを追加」のとき)</span></label>
-            <button class="btn primary block" id="btn-add" type="button">パーツを追加</button>
           </div>
           <div class="sec">
             <h3>動かす <span class="kbd">矢印 / Shift+↑↓ / R</span></h3>
@@ -418,47 +442,6 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
               <button class="btn grow" id="btn-selall" type="button">全部選ぶ</button>
             </div>
             <p class="hint">マウスなら <span class="kbd">Shift+ドラッグ</span> でパーツをつかんで動かせます (Shift+クリックは選択に足す / 外す)。ほかのパーツや基礎板にはめり込みません。</p>
-          </div>
-          <div class="sec">
-            <h3>まとめて選ぶ</h3>
-            <div class="row">
-              <button class="btn grow" id="sel-color" type="button">同じ色を全部</button>
-              <button class="btn grow" id="sel-layer" type="button">この段を全部</button>
-            </div>
-            <div class="row">
-              <button class="btn grow" id="sel-connected" type="button">つながっているもの全部</button>
-              <button class="btn grow" id="sel-none" type="button">選択をやめる</button>
-            </div>
-            <p class="hint">選んでいるパーツ (オレンジの矢印) を基準にします。</p>
-          </div>
-          <div class="sec">
-            <h3>部品を変える</h3>
-            <button class="btn block" id="op-replace" type="button">選んだパーツを、上で選んでいる部品に置き換える</button>
-            <div class="row">
-              <button class="btn grow" id="op-split" type="button">細かく分ける (1x1 に)</button>
-              <button class="btn grow" id="op-merge" type="button">1 つにまとめる</button>
-            </div>
-            <p class="hint">「まとめる」は、選んだパーツのうち同じ色・同じ段で隣り合うものを、なるべく大きな部品に組み直します。</p>
-          </div>
-          <div class="sec">
-            <h3>確認</h3>
-            <button class="btn dark block" id="btn-check" type="button">組み立てチェック</button>
-            <p class="hint">重なっているパーツと、本体とつながっていない (浮いている) パーツを探して選びます。</p>
-          </div>
-          <div class="sec">
-            <h3>作業台</h3>
-            <div class="row">
-              <label class="check grow"><input type="checkbox" id="opt-base" checked><span>基礎板を敷く</span></label>
-              <input class="input num" id="base-size" type="number" min="8" max="96" step="1" value="48" aria-label="基礎板の大きさ (ポッチ)">
-              <span class="hint">ポッチ</span>
-            </div>
-            <label class="check"><input type="checkbox" id="opt-edges" checked><span>ブリックの輪郭線を引く <small class="hint">同じ色が並んでも 1 個ずつ見分けやすくなる</small></span></label>
-            <div class="row">
-              <label class="lbl" for="light-power">光の強さ</label>
-              <input class="grow" id="light-power" type="range" min="20" max="200" step="5" value="100">
-              <span class="kbd" id="light-val">100%</span>
-            </div>
-            <button class="btn block" id="btn-clear" type="button">すべてのパーツを消す</button>
           </div>
         </section>
 
@@ -536,6 +519,57 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 
     <section class="stage" id="stage" aria-label="作業台">
       <canvas id="view"></canvas>
+      <div class="drawer" id="drawer" hidden>
+        <div class="drawer-head"><b id="drawer-title"></b><button class="btn x" id="drawer-close" type="button" aria-label="閉じる">×</button></div>
+        <div class="drawer-body">
+        <div class="dpane" data-pane="color" data-title="色" hidden>
+            <p class="pane-sub">今の色: <span class="color-name" id="color-name"></span></p>
+            <div class="swatches" id="swatches"></div>
+        </div>
+        <div class="dpane" data-pane="place" data-title="置く・追加" hidden>
+            <button class="btn block" id="btn-place" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3v18M3 12h18"/></svg><span id="place-label">クリックで置くモード</span><span class="kbd">P</span></button>
+            <label class="check"><input type="checkbox" id="opt-stack" checked><span>選択中のパーツの上に積む (「パーツを追加」のとき)</span></label>
+            <button class="btn primary block" id="btn-add" type="button">パーツを追加</button>
+        </div>
+        <div class="dpane" data-pane="select" data-title="まとめて選ぶ" hidden>
+            <div class="row">
+              <button class="btn grow" id="sel-color" type="button">同じ色を全部</button>
+              <button class="btn grow" id="sel-layer" type="button">この段を全部</button>
+            </div>
+            <div class="row">
+              <button class="btn grow" id="sel-connected" type="button">つながっているもの全部</button>
+              <button class="btn grow" id="sel-none" type="button">選択をやめる</button>
+            </div>
+            <p class="hint">選んでいるパーツ (オレンジの矢印) を基準にします。</p>
+        </div>
+        <div class="dpane" data-pane="change" data-title="部品を変える" hidden>
+            <button class="btn block" id="op-replace" type="button">選んだパーツを、上で選んでいる部品に置き換える</button>
+            <div class="row">
+              <button class="btn grow" id="op-split" type="button">細かく分ける (1x1 に)</button>
+              <button class="btn grow" id="op-merge" type="button">1 つにまとめる</button>
+            </div>
+            <p class="hint">「まとめる」は、選んだパーツのうち同じ色・同じ段で隣り合うものを、なるべく大きな部品に組み直します。</p>
+        </div>
+        <div class="dpane" data-pane="check" data-title="確認" hidden>
+            <button class="btn dark block" id="btn-check" type="button">組み立てチェック</button>
+            <p class="hint">重なっているパーツと、本体とつながっていない (浮いている) パーツを探して選びます。</p>
+        </div>
+        <div class="dpane" data-pane="stage" data-title="作業台" hidden>
+            <div class="row">
+              <label class="check grow"><input type="checkbox" id="opt-base" checked><span>基礎板を敷く</span></label>
+              <input class="input num" id="base-size" type="number" min="8" max="96" step="1" value="48" aria-label="基礎板の大きさ (ポッチ)">
+              <span class="hint">ポッチ</span>
+            </div>
+            <label class="check"><input type="checkbox" id="opt-edges" checked><span>ブリックの輪郭線を引く <small class="hint">同じ色が並んでも 1 個ずつ見分けやすくなる</small></span></label>
+            <div class="row">
+              <label class="lbl" for="light-power">光の強さ</label>
+              <input class="grow" id="light-power" type="range" min="20" max="200" step="5" value="100">
+              <span class="kbd" id="light-val">100%</span>
+            </div>
+            <button class="btn block" id="btn-clear" type="button">すべてのパーツを消す</button>
+        </div>
+        </div>
+      </div>
       <div class="hud" id="hud"></div>
       <div class="chip mode dragchip" id="hud-drag" aria-live="polite"></div>
       <div class="boxsel" id="boxsel" hidden></div>
@@ -3504,11 +3538,31 @@ const TOOL_HINTS = {
   pick: "パーツをクリックすると、その色を拾って、前の道具に戻ります。",
   erase: "パーツをクリック (なぞる) と消します。Ctrl+Z で戻せます。",
 };
+// ---- 作業台の上の引き出し (つくるタブの「ほかの道具」を押すと、その中身がここに出る)
+let openPaneKey = null;
+function openPane(key, toggle = true) {
+  if (toggle && openPaneKey === key) return closePane();
+  openPaneKey = key;
+  for (const el of $$(".dpane")) el.hidden = el.dataset.pane !== key;
+  const pane = $$(".dpane").find((el) => el.dataset.pane === key);
+  $("drawer-title").textContent = pane ? pane.dataset.title : "";
+  $("drawer").hidden = false;
+  document.body.classList.add("drawer-open");
+  for (const b of $$("[data-open]")) b.setAttribute("aria-expanded", String(b.dataset.open === key));
+}
+function closePane() {
+  openPaneKey = null;
+  $("drawer").hidden = true;
+  document.body.classList.remove("drawer-open");
+  for (const b of $$("[data-open]")) b.setAttribute("aria-expanded", "false");
+}
 function setTool(t) {
   if (t !== "pick") S.prevTool = t;
   S.tool = t;
   for (const b of $$("[data-tool]")) b.setAttribute("aria-pressed", String(b.dataset.tool === t));
   $("tool-hint").textContent = TOOL_HINTS[t];
+  if ((t === "paint" || t === "pick") && openPaneKey !== "color") openPane("color", false);  // 塗るときは色を出しておく
+  if (t === "place" && !openPaneKey) openPane("place", false);
   if ((t === "place") !== S.placing) setPlacingRaw(t === "place");
   refreshHud();
 }
@@ -3947,11 +4001,12 @@ function refreshOrder() {
 
 // ---------------------------------------------------------------- 部品の棚・色
 let _thumbs = new Map();
-let shelfFilter = "all";
+let shelfFilter = "basic";  // はじめは基本の部品 (変換の基本セットと同じ 11 種類)
 function renderShelf() {
   const shelf = $("shelf");
   shelf.textContent = "";
   for (const [part, shape, l, w, h] of PARTS) {
+    if (shelfFilter === "basic" && !BASIC_PARTS.includes(part)) continue;
     if (shelfFilter === "plate" && h !== PLATE_H) continue;
     if (shelfFilter === "brick" && h !== BRICK_H) continue;
     const b = document.createElement("button");
@@ -3986,6 +4041,8 @@ function renderSwatches() {
   const [name, hex] = colorInfo(S.color);
   $("color-name").textContent = `${name.replace(/_/g, " ")} (${S.color})`;
   $("paint-dot").style.background = "#" + hex;  // 「色を変える」で塗る色
+  $("item-color-dot").style.background = "#" + hex;
+  $("item-color-name").textContent = name.replace(/_/g, " ");
 }
 function refreshExtChip() {
   $("ext-chip").hidden = !S.ext;
@@ -4765,6 +4822,8 @@ function wire() {
   $("xp-q").oninput = () => { clearTimeout(_xpTimer); _xpTimer = setTimeout(xpSearch, 150); };
   $("btn-place").onclick = () => setPlacing(!S.placing);
   for (const b of $$("[data-tool]")) b.onclick = () => setTool(b.dataset.tool);
+  for (const b of $$("[data-open]")) b.onclick = () => openPane(b.dataset.open);
+  $("drawer-close").onclick = closePane;
   $("sel-color").onclick = () => selectWhere((p, b) => p.color === b.color, "同じ色");
   $("sel-layer").onclick = () => selectWhere((p, b) => partBottom(p) === partBottom(b), "この段");
   $("sel-connected").onclick = selectConnected;
@@ -4859,7 +4918,7 @@ function onKey(e) {
     return rotateSelected();
   }
   if (k === "Delete" || k === "Backspace") { handled(); return deleteSelected(); }
-  if (k === "Escape") { if (DRAG.on) return endDrag(false); if (S.tool !== "select") return setTool("select"); return clearSelection(); }
+  if (k === "Escape") { if (DRAG.on) return endDrag(false); if (openPaneKey) return closePane(); if (S.tool !== "select") return setTool("select"); return clearSelection(); }
   if (k === "p" || k === "P") return setPlacing(!S.placing);
   const toolKeys = { v: "select", m: "box", b: "paint", i: "pick", e: "erase" };
   if (toolKeys[k.toLowerCase()]) return setTool(toolKeys[k.toLowerCase()]);
