@@ -401,7 +401,6 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
             <h3>ほかの道具 <small class="hint">押すと作業台の上に出ます</small></h3>
             <div class="items">
               <button class="item" type="button" data-open="color" aria-expanded="false"><span class="dot" id="item-color-dot"></span><span>色</span><small id="item-color-name"></small></button>
-              <button class="item" type="button" data-open="place" aria-expanded="false"><span class="ii">＋</span><span>置く・追加</span></button>
               <button class="item" type="button" data-open="select" aria-expanded="false"><span class="ii">☰</span><span>まとめて選ぶ</span></button>
               <button class="item" type="button" data-open="change" aria-expanded="false"><span class="ii">⇄</span><span>部品を変える</span></button>
               <button class="item" type="button" data-open="check" aria-expanded="false"><span class="ii">✓</span><span>確認</span></button>
@@ -537,11 +536,6 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
         <div class="dpane" data-pane="color" data-title="色" hidden>
             <p class="pane-sub">今の色: <span class="color-name" id="color-name"></span></p>
             <div class="swatches" id="swatches"></div>
-        </div>
-        <div class="dpane" data-pane="place" data-title="置く・追加" hidden>
-            <button class="btn block" id="btn-place" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 3v18M3 12h18"/></svg><span id="place-label">クリックで置くモード</span><span class="kbd">P</span></button>
-            <label class="check"><input type="checkbox" id="opt-stack" checked><span>選択中のパーツの上に積む (「パーツを追加」のとき)</span></label>
-            <button class="btn primary block" id="btn-add" type="button">パーツを追加</button>
         </div>
         <div class="dpane" data-pane="select" data-title="まとめて選ぶ" hidden>
             <div class="row">
@@ -3561,6 +3555,7 @@ function openPane(key, toggle = true) {
   $("drawer").hidden = false;
   document.body.classList.add("drawer-open");
   for (const b of $$("[data-open]")) b.setAttribute("aria-expanded", String(b.dataset.open === key));
+  if ((key === "select" || key === "change") && S.tool !== "select") setTool("select");  // 選んだパーツに使うので「選ぶ」に
 }
 function closePane() {
   openPaneKey = null;
@@ -3572,7 +3567,6 @@ function setTool(t) {
   // 道具を替えたら、その道具のために自動で開いた引き出しは閉じる (塗る → 色、置く → 置く・追加)
   const was = S.tool;
   if ((was === "paint" || was === "pick") && !(t === "paint" || t === "pick") && openPaneKey === "color") closePane();
-  if (was === "place" && t !== "place" && openPaneKey === "place") closePane();
   if (t !== "pick") S.prevTool = t;
   S.tool = t;
   for (const b of $$("[data-tool]")) b.setAttribute("aria-pressed", String(b.dataset.tool === t));
@@ -3586,8 +3580,6 @@ function setPlacing(on) {
 }
 function setPlacingRaw(on) {
   S.placing = on;
-  $("btn-place").classList.toggle("on", on);
-  $("place-label").textContent = on ? "置くモード中 (Esc でやめる)" : "クリックで置くモード";
   $("placebar").hidden = !on;
   document.body.classList.toggle("placing", on);  // スマホでは置くモード中、視点のボタンを隠す (置くバーと重なるため)
   if (!on) { ghost.visible = false; needRender = true; }
@@ -4838,7 +4830,6 @@ function wire() {
     e.target.value = "";
   };
   $("xp-q").oninput = () => { clearTimeout(_xpTimer); _xpTimer = setTimeout(xpSearch, 150); };
-  $("btn-place").onclick = () => setPlacing(!S.placing);
   for (const b of $$("[data-tool]")) b.onclick = () => setTool(b.dataset.tool);
   for (const b of $$("[data-open]")) b.onclick = () => openPane(b.dataset.open);
   $("drawer-close").onclick = closePane;
@@ -4851,8 +4842,6 @@ function wire() {
   $("op-merge").onclick = mergeSelected;
   $("place-off").onclick = () => setPlacing(false);
   $("ghost-rot").onclick = () => { S.ghostRot = (S.ghostRot + 90) % 360; };
-  $("opt-stack").onchange = (e) => { S.stack = e.target.checked; };
-  $("btn-add").onclick = addPart;
   for (const b of $$("[data-move]")) b.onclick = () => moveSelected(b.dataset.move);
   $("btn-rotate").onclick = rotateSelected;
   $("btn-paint").onclick = paintSelected;
