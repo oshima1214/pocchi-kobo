@@ -1486,11 +1486,40 @@ function csvText(rows) {
   return "﻿" + lines.map((l) => l.map(esc).join(",")).join("\r\n") + "\r\n";
 }
 
+// ---------------------------------------------------------------- 状態機械 (画面の「いま何をしているか」を 1 か所で持つ)
+// createMachine("gesture", { initial: "idle", states: { idle: ["drag"], drag: ["idle"] }, onChange })
+//   states: 状態 → そこから行ける状態のリスト。表にない移り変わりは行わず、警告して false を返す (例外は投げない)
+//   go(next, data): 移る。同じ状態への go は data だけ差し替える
+//   is(...names) / can(next) / state / data / history (直近 30 回) / table (移り変わりの表)
+function createMachine(name, { initial, states, onChange = null }) {
+  const m = {
+    name, state: initial, data: null, table: states, history: [],
+    is: (...names) => names.includes(m.state),
+    can: (next) => next === m.state || (states[m.state] || []).includes(next),
+    go(next, data = null) {
+      if (!(next in states)) { console.warn(`[${name}] 知らない状態: ${next}`); return false; }
+      if (next !== m.state && !states[m.state].includes(next)) {
+        console.warn(`[${name}] ${m.state} → ${next} はできません`);
+        return false;
+      }
+      const from = m.state;
+      m.state = next; m.data = data;
+      if (from !== next) {
+        m.history.push([from, next]);
+        if (m.history.length > 30) m.history.shift();
+        if (onChange) onChange(next, from, data);
+      }
+      return true;
+    },
+  };
+  return m;
+}
+
 if (typeof module !== "undefined") {
   module.exports = {
     STUD, PLATE_H, BRICK_H, PARTS, PART_INFO, partDims, partHeight, packRectangles, packLayers, packVoxels,
     fillLeftovers, boxParts, buildSequence, bottomUpBuildable, checkBuild, partCells, partBottom, ldrawText,
-    ldrawLine, parseLdr, countParts, csvText, pyRound, EXT_PARTS, connectFloating, partGroups,
+    ldrawLine, parseLdr, countParts, csvText, pyRound, EXT_PARTS, connectFloating, partGroups, createMachine,
   };
 }
 
@@ -2734,7 +2763,13 @@ function toast(text, kind = "info", ms = 6000) {
 }
 // 元に戻す方法の一言 (スマホはボタン、パソコンは Ctrl+Z)
 function undoHint() { return matchMedia("(max-width: 860px)").matches ? "" : " (Ctrl+Z で戻せます)"; }
+// 画面の状態は <body data-ui-*> に出す (CSS・テスト・自動操作が読む)。ボタンが使う data-tool / data-view などと
+// 名前がぶつからないよう、必ず ui- を付ける (ぶつかると $$("[data-view]") が body まで拾ってしまう)
+function setUi(key, value) { document.body.dataset["ui" + key[0].toUpperCase() + key.slice(1)] = value; }
+let _busy = false;  // 処理中 (重い計算の間)。body[data-ui-busy] にも出す。この間はキー操作を受けない
 function setBusy(text) {
+  _busy = !!text;
+  setUi("busy", _busy ? "1" : "0");
   $("busy").hidden = !text;
   if (text) $("busy-text").textContent = text;
 }
@@ -2770,7 +2805,8 @@ const S = {
   parts: [], nextId: 1, ver: 0,
   sel: new Set(), active: null,
   partChoice: "3001.dat", ext: null, color: 4, stack: true,
-  placing: false, ghostRot: 0,
+  get placing() { return this.tool === "place"; },  // 置くモード = 道具が「置く」(別に持たない)
+  ghostRot: 0, tab: "build",
   tool: "select", prevTool: "select",  // 選ぶ / 範囲で選ぶ / 置く / 塗る / スポイト / 消しゴム
   baseplate: true, baseSize: 48,
   layer: 0, piece: 0, playing: false, interval: 0.15,
@@ -2781,6 +2817,40 @@ const S = {
   light: 1,              // 4 方向の光の強さ (1 = ふつう)
   edges: true,           // ブリックの輪郭線
 };
+// ---------------------------------------------------------------- 状態機械 (webapp/STATE_MACHINES.md に一覧)
+// 「いま何をしているか」は必ずここを通して変える。今の状態は body の data-* にも出るので、CSS・テスト・自動操作から読める
+const reflectState = (name) => (to) => { setUi(name, to); };
+// 作業台の上での指・マウスの操作。同時に 1 つだけ
+//   pending = Shift を押しながらパーツを押した (動かせば drag、離せば選択に足す / 外す)
+const GESTURE = createMachine("gesture", {
+  initial: "idle",
+  states: { idle: ["pending", "stroke", "box"], pending: ["drag", "idle"], drag: ["idle"], stroke: ["idle"], box: ["idle"] },
+  onChange: reflectState("gesture"),
+});
+// 変換の画面のプレビュー
+const PREVIEW = createMachine("preview", {
+  initial: "idle",
+  states: {
+    idle: ["scheduled"], scheduled: ["computing", "ready", "error", "idle"],
+    computing: ["ready", "error", "scheduled", "idle"], ready: ["scheduled", "idle"], error: ["scheduled", "idle"],
+  },
+  onChange: (to) => {
+    $("dlg-convert").dataset.preview = to;
+    $("pv-busy").hidden = !(to === "scheduled" || to === "computing");
+  },
+});
+// 「すべてのパーツを消す」: 1 回目で armed、4 秒以内の 2 回目で消す
+let _clearTimer = 0;
+const CLEAR = createMachine("clear", {
+  initial: "idle",
+  states: { idle: ["armed"], armed: ["idle"] },
+  onChange: (to) => {
+    $("btn-clear").textContent = to === "armed" ? "もう一度押すと消えます" : "すべてのパーツを消す";
+    clearTimeout(_clearTimer);
+    if (to === "armed") _clearTimer = setTimeout(() => CLEAR.go("idle"), 4000);
+  },
+});
+
 const undoStack = [], redoStack = [];
 const MOVES = { LEFT: [-STUD, 0, 0], RIGHT: [STUD, 0, 0], BACK: [0, STUD, 0], FRONT: [0, -STUD, 0], UP: [0, 0, PLATE_H], DOWN: [0, 0, -PLATE_H] };
 const RESOLUTIONS = [["COARSE", "粗い", 12], ["NORMAL", "ふつう", 24], ["FINE", "細かい", 48]];
@@ -2812,17 +2882,19 @@ function edit(fn, structural = true) {
 }
 function changed(structural = true) {
   S.ver++;
-  if (structural && (S.layer || S.piece)) { stopPlay(); S.layer = 0; S.piece = 0; }
+  if (structural && (S.layer || S.piece)) showAll();
   refreshAll();
   saveLocal();
 }
 function undo() {
+  cancelGesture();
   if (!undoStack.length) return;
   redoStack.push(snapshot());
   restore(undoStack.pop());
   changed();
 }
 function redo() {
+  cancelGesture();
   if (!redoStack.length) return;
   undoStack.push(snapshot());
   restore(redoStack.pop());
@@ -2873,6 +2945,16 @@ function partsUpToLayer(n) {
   if (!levels.length) return new Set();
   const limit = levels[Math.min(n, levels.length) - 1];
   return new Set(seq.filter(([, s]) => s <= limit).map(([p]) => p));
+}
+// 表示の状態: all (全部) / layer (n 段目まで) / piece (n 個目まで)。S.layer と S.piece はどちらか一方だけが 0 以外
+function viewState() {
+  return { mode: S.piece ? "piece" : S.layer ? "layer" : "all", n: S.piece || S.layer || 0, playing: !!S.playing };
+}
+function showAll() { stopPlay(); S.layer = 0; S.piece = 0; }  // 全部表示に戻す (描き直しは呼ぶ側で)
+function syncViewAttrs() {
+  const v = viewState();
+  setUi("view", v.mode);
+  setUi("playing", v.playing ? "1" : "0");
 }
 function previewParts() {  // いま見せているところまでのパーツ (Set)。全部表示なら null
   if (S.piece) return new Set(steps().seq.slice(0, S.piece).map(([p]) => p));
@@ -2937,6 +3019,7 @@ function togglePlay() {
   _playTimer = setTimeout(tick, Math.max(20, S.interval * 1000));
 }
 function refreshPlayButton() {
+  syncViewAttrs();
   $("btn-play").textContent = S.playing ? "❚❚ 止める" : "▶ 自動で組み立てる";
 }
 
@@ -3450,17 +3533,10 @@ function checkParts() {
   if (overlapping.size || floating.size) toast(`重なり ${overlapping.size} 個 / 浮いている ${floating.size} 個 (選択しました)`, "warn");
   else toast("重なりも浮いているパーツもありません");
 }
-let _clearArmed = 0;
 function clearAll() {
   if (!S.parts.length) return;
-  if (Date.now() - _clearArmed > 4000) {
-    _clearArmed = Date.now();
-    $("btn-clear").textContent = "もう一度押すと消えます";
-    setTimeout(() => { $("btn-clear").textContent = "すべてのパーツを消す"; }, 4000);
-    return;
-  }
-  _clearArmed = 0;
-  $("btn-clear").textContent = "すべてのパーツを消す";
+  if (!CLEAR.is("armed")) { CLEAR.go("armed"); return; }
+  CLEAR.go("idle");
   edit(() => { S.parts = []; S.sel.clear(); S.active = null; S.groups.clear(); });
   S.sources.clear(); rebuildOverlay(); syncSourceStore();
   toast(`すべて消しました${undoHint()}`);
@@ -3549,6 +3625,7 @@ let openPaneKey = null;
 function openPane(key, toggle = true) {
   if (toggle && openPaneKey === key) return closePane();
   openPaneKey = key;
+  setUi("pane", key);
   for (const el of $$(".dpane")) el.hidden = el.dataset.pane !== key;
   const pane = $$(".dpane").find((el) => el.dataset.pane === key);
   $("drawer-title").textContent = pane ? pane.dataset.title : "";
@@ -3559,34 +3636,52 @@ function openPane(key, toggle = true) {
 }
 function closePane() {
   openPaneKey = null;
+  setUi("pane", "");
   $("drawer").hidden = true;
   document.body.classList.remove("drawer-open");
   for (const b of $$("[data-open]")) b.setAttribute("aria-expanded", "false");
 }
 function setTool(t) {
+  cancelGesture();  // 操作の途中で道具が替わることはない
   // 道具を替えたら、その道具のために自動で開いた引き出しは閉じる (塗る → 色、置く → 置く・追加)
   const was = S.tool;
   if ((was === "paint" || was === "pick") && !(t === "paint" || t === "pick") && openPaneKey === "color") closePane();
   if (t !== "pick") S.prevTool = t;
   S.tool = t;
-  for (const b of $$("[data-tool]")) b.setAttribute("aria-pressed", String(b.dataset.tool === t));
+  setUi("tool", t);
+  for (const b of $$("button[data-tool]")) b.setAttribute("aria-pressed", String(b.dataset.tool === t));
   $("tool-hint").textContent = TOOL_HINTS[t];
   if ((t === "paint" || t === "pick") && openPaneKey !== "color") openPane("color", false);  // 塗るときは色を出しておく
-  if ((t === "place") !== S.placing) setPlacingRaw(t === "place");
+  syncPlacing();
   refreshHud();
 }
 function setPlacing(on) {
   setTool(on ? "place" : "select");
 }
-function setPlacingRaw(on) {
-  S.placing = on;
+function syncPlacing() {  // 置くモードの見た目を、道具に合わせる
+  const on = S.placing;
   $("placebar").hidden = !on;
   document.body.classList.toggle("placing", on);  // スマホでは置くモード中、視点のボタンを隠す (置くバーと重なるため)
   if (!on) { ghost.visible = false; needRender = true; }
-  refreshHud();
+}
+// ---- 作業台の上の操作 (GESTURE)。始めたら必ず idle に戻す: 指を離す / Esc / 中断 (pointercancel・ウィンドウが裏へ)
+function capturePointer(ev) {
+  try { canvas.setPointerCapture(ev.pointerId); } catch { /* つかめなくても操作は続けられる */ }
+}
+// 途中の操作をやめる。revertStroke: なぞって塗った・消した分を元に戻す (Esc)。中断のときは、そこまでの分を残す
+function cancelGesture(revertStroke = false) {
+  switch (GESTURE.state) {
+    case "idle": return;
+    case "drag": endDrag(false); return;
+    case "stroke": finishStroke(!revertStroke); return;
+    case "box": BOX = null; $("boxsel").hidden = true; break;
+    default: break;
+  }
+  controls.enabled = true;
+  GESTURE.go("idle");
 }
 // ---- Shift + 右ドラッグ: 選んだパーツをつかんで動かす。重力があるように、行き先の一番上に乗る
-const DRAG = { on: false, ids: null, anchor: null, list: [], colTop: null, dx: 0, dy: 0, dz: 0 };
+const DRAG = { get on() { return GESTURE.is("drag"); }, ids: null, anchor: null, list: [], colTop: null, dx: 0, dy: 0, dz: 0 };
 const dragGhost = new THREE.Group();
 scene.add(dragGhost);
 // 点線 (太さはピクセルで決める線。ほかの物に隠れないよう一番手前に描く)
@@ -3607,7 +3702,7 @@ const dragDots = [0, 1].map(() => {  // 点線の両端 (つかんだ所と行�
 const _cellCol = (c) => Math.floor(c / 4096), _cellZ = (c) => c % 4096 - 2048;
 
 function startDrag(anchorId, ev) {
-  DRAG.on = true;
+  GESTURE.go("drag");
   DRAG.ids = new Set(S.sel);
   DRAG.anchor = byId(anchorId);
   DRAG.list = selectedParts();
@@ -3622,7 +3717,7 @@ function startDrag(anchorId, ev) {
   }
   DRAG.cells = DRAG.list.map((p) => partCells(p));
   controls.enabled = false;
-  canvas.setPointerCapture(ev.pointerId);
+  capturePointer(ev);
   for (const c of [...dragGhost.children]) { dragGhost.remove(c); c.material.dispose(); }
   for (const p of DRAG.list.slice(0, 400)) {  // 行き先に透明な部品を出す (多すぎるときは 400 個まで)
     const m = new THREE.Mesh(partGeometry(p.part), new THREE.MeshStandardMaterial({
@@ -3680,8 +3775,8 @@ function updateDrag(ev) {
   needRender = true;
 }
 function endDrag(commit) {
-  if (!DRAG.on) return;
-  DRAG.on = false;
+  if (!GESTURE.is("drag")) return;
+  GESTURE.go("idle");
   controls.enabled = true;
   dragLine.visible = dragGhost.visible = false;
   for (const d of dragDots) d.visible = false;
@@ -3691,33 +3786,31 @@ function endDrag(commit) {
   if (commit && (dx || dy || dz)) edit(() => { for (const p of list) { p.x += dx; p.y += dy; p.z += dz; } });
 }
 // Shift + 左ボタン: パーツの上で押して 5px 以上動かしたらつかんで移動。動かさずに離したら選択に足す / 外す
-let _pending = null;
 canvas.addEventListener("pointerdown", (ev) => {
-  if (ev.button !== 0 || !ev.shiftKey || S.placing) return;
+  if (ev.button !== 0 || !ev.shiftKey || S.placing || !GESTURE.is("idle")) return;
   setPointer(ev);
   const got = pickPart();
   if (!got) return;  // 何もない所では、ふつうの視点操作
   ev.preventDefault();
   ev.stopImmediatePropagation();  // 視点の移動にしない
-  _pending = { id: got.part.id, x: ev.clientX, y: ev.clientY };
+  GESTURE.go("pending", { id: got.part.id, x: ev.clientX, y: ev.clientY });
   controls.enabled = false;
-  canvas.setPointerCapture(ev.pointerId);
+  capturePointer(ev);
 }, { capture: true });
 canvas.addEventListener("pointermove", (ev) => {
-  if (_pending && !DRAG.on && Math.hypot(ev.clientX - _pending.x, ev.clientY - _pending.y) > 5) {
-    const id = _pending.id;
-    _pending = null;
+  if (GESTURE.is("pending") && Math.hypot(ev.clientX - GESTURE.data.x, ev.clientY - GESTURE.data.y) > 5) {
+    const id = GESTURE.data.id;
     if (!S.sel.has(id)) { S.sel = new Set([id]); S.active = id; refreshView(); refreshStatus(); }
     startDrag(id, ev);
   }
-  if (DRAG.on) { ev.stopImmediatePropagation(); updateDrag(ev); }
+  if (GESTURE.is("drag")) { ev.stopImmediatePropagation(); updateDrag(ev); }
 }, { capture: true });
 canvas.addEventListener("pointerup", (ev) => {
-  if (DRAG.on) { ev.stopImmediatePropagation(); endDrag(true); return; }
-  if (_pending) {
+  if (GESTURE.is("drag")) { ev.stopImmediatePropagation(); endDrag(true); return; }
+  if (GESTURE.is("pending")) {
     ev.stopImmediatePropagation();
-    const id = _pending.id;
-    _pending = null;
+    const id = GESTURE.data.id;
+    GESTURE.go("idle");
     controls.enabled = true;
     if (S.sel.has(id)) { S.sel.delete(id); if (S.active === id) S.active = null; } else { S.sel.add(id); S.active = id; }
     refreshView(); refreshStatus(); refreshConvert();
@@ -3725,14 +3818,14 @@ canvas.addEventListener("pointerup", (ev) => {
 }, { capture: true });
 
 // ---- 塗る・消しゴム (なぞると続けて) / スポイト / 範囲で選ぶ
-const STROKE = { on: false, n: 0 };
+const STROKE = { get on() { return GESTURE.is("stroke"); }, n: 0 };
 let BOX = null;
 function strokeAt(ev) {
   setPointer(ev);
   const got = pickPart();
   if (!got) return;
   const p = got.part;
-  if (S.tool === "paint") {
+  if (GESTURE.data.kind === "paint") {  // 始めたときの道具で続ける (途中で道具が替わっても、塗るが消すにならない)
     if (p.color === S.color) return;
     p.color = S.color;
   } else {
@@ -3743,17 +3836,27 @@ function strokeAt(ev) {
   STROKE.n++;
   rebuildParts();
 }
+function finishStroke(commit) {
+  if (!GESTURE.is("stroke")) return;
+  const { kind } = GESTURE.data;
+  GESTURE.go("idle");
+  controls.enabled = true;
+  if (!STROKE.n) { undoStack.pop(); return; }  // 何も変えなかった: 取り消しの記録も残さない
+  if (commit) changed(kind === "erase");
+  else { restore(undoStack.pop()); changed(); }
+}
 canvas.addEventListener("pointerdown", (ev) => {
-  if (ev.button !== 0 || ev.shiftKey) return;
+  if (ev.button !== 0 || ev.shiftKey || !GESTURE.is("idle")) return;
   const t = S.tool;
   if (t === "paint" || t === "erase") {
     setPointer(ev);
     if (!pickPart()) return;  // 何もない所: ふつうの視点操作
     ev.preventDefault(); ev.stopImmediatePropagation();
     undoStack.push(snapshot()); redoStack.length = 0;
-    STROKE.on = true; STROKE.n = 0;
+    GESTURE.go("stroke", { kind: t });
+    STROKE.n = 0;
     controls.enabled = false;
-    canvas.setPointerCapture(ev.pointerId);
+    capturePointer(ev);
     strokeAt(ev);
   } else if (t === "pick") {
     setPointer(ev);
@@ -3768,13 +3871,14 @@ canvas.addEventListener("pointerdown", (ev) => {
     ev.preventDefault(); ev.stopImmediatePropagation();
     const r = $("stage").getBoundingClientRect();
     BOX = { x0: ev.clientX - r.left, y0: ev.clientY - r.top, add: ev.ctrlKey || ev.metaKey };
+    GESTURE.go("box");
     controls.enabled = false;
-    canvas.setPointerCapture(ev.pointerId);
+    capturePointer(ev);
   }
 }, { capture: true });
 canvas.addEventListener("pointermove", (ev) => {
-  if (STROKE.on) { ev.stopImmediatePropagation(); strokeAt(ev); return; }
-  if (BOX) {
+  if (GESTURE.is("stroke")) { ev.stopImmediatePropagation(); strokeAt(ev); return; }
+  if (GESTURE.is("box")) {
     ev.stopImmediatePropagation();
     const r = $("stage").getBoundingClientRect(), x = ev.clientX - r.left, y = ev.clientY - r.top, el = $("boxsel");
     Object.assign(el.style, { left: Math.min(x, BOX.x0) + "px", top: Math.min(y, BOX.y0) + "px",
@@ -3783,14 +3887,8 @@ canvas.addEventListener("pointermove", (ev) => {
   }
 }, { capture: true });
 canvas.addEventListener("pointerup", (ev) => {
-  if (STROKE.on) {
-    ev.stopImmediatePropagation();
-    STROKE.on = false;
-    controls.enabled = true;
-    if (!STROKE.n) undoStack.pop(); else changed(S.tool === "erase");
-    return;
-  }
-  if (BOX) {
+  if (GESTURE.is("stroke")) { ev.stopImmediatePropagation(); finishStroke(true); return; }
+  if (GESTURE.is("box")) {
     ev.stopImmediatePropagation();
     const r = $("stage").getBoundingClientRect(), x1 = ev.clientX - r.left, y1 = ev.clientY - r.top;
     const [ax, bx] = [Math.min(x1, BOX.x0), Math.max(x1, BOX.x0)], [ay, by] = [Math.min(y1, BOX.y0), Math.max(y1, BOX.y0)];
@@ -3806,11 +3904,16 @@ canvas.addEventListener("pointerup", (ev) => {
     S.active = hit.length ? hit[hit.length - 1].id : S.active;
     BOX = null;
     $("boxsel").hidden = true;
+    GESTURE.go("idle");
     controls.enabled = true;
     refreshView(); refreshStatus(); refreshConvert();
     toast(`${hit.length} 個選びました`, "info", 2000);
   }
 }, { capture: true });
+// 操作が中断されたら (タッチの中断・別のウィンドウへ)、必ず idle に戻す。戻さないと視点が動かせないままになる
+canvas.addEventListener("pointercancel", () => cancelGesture());
+canvas.addEventListener("lostpointercapture", () => cancelGesture());
+window.addEventListener("blur", () => cancelGesture());
 
 // ---- まとめて選ぶ
 function selectionBase() {
@@ -3956,6 +4059,7 @@ function sizeText(sz) {
     `約 ${cm(w * STUD)} × ${cm(d * STUD)} × ${cm(h)} cm (横 × 奥行き × 高さ)`];
 }
 function refreshOrder() {
+  syncViewAttrs();
   const { seq, levels } = steps();
   const box = $("order-size");
   box.textContent = "";
@@ -4280,23 +4384,24 @@ function showPreviewModel(model) {
 function schedulePreview(delay = 180) {
   if (!CV.model || !$("dlg-convert").open) return;
   clearTimeout(PV.timer);
-  $("pv-busy").hidden = false;
+  PREVIEW.go("scheduled");
   PV.timer = setTimeout(updatePreview, delay);
 }
 async function updatePreview() {
   const opts = convertOptions(), key = optsKey(opts), my = ++PV.seq;
   const need = opts.height === "BRICK" ? BRICK_H : PLATE_H;
   if (!boxParts(need, opts.allowed).length) {
-    $("pv-busy").hidden = true;
+    PREVIEW.go("error");
     $("pv-stats").textContent = `使う${need === BRICK_H ? "ブリック" : "プレート"}が選ばれていません`;
     return;
   }
-  if (PV.result && PV.result.key === key) { $("pv-busy").hidden = true; return; }
+  if (PV.result && PV.result.key === key) { PREVIEW.go("ready"); return; }
+  PREVIEW.go("computing");
   await nextFrame();
   if (my !== PV.seq) return;  // もっと新しい設定が来た
   let res;
   try { res = convertModel(CV.model.root, CV.model.ext, opts); } catch (e) {
-    $("pv-busy").hidden = true; $("pv-stats").textContent = `プレビューを作れませんでした: ${e.message || e}`; return;
+    PREVIEW.go("error"); $("pv-stats").textContent = `プレビューを作れませんでした: ${e.message || e}`; return;
   }
   if (my !== PV.seq) return;
   PV.result = { key, res };
@@ -4375,7 +4480,7 @@ async function updatePreview() {
     $("pv-delta").classList.remove("flash"); void $("pv-delta").offsetWidth; $("pv-delta").classList.add("flash");
   }
   PV.last = now;
-  $("pv-busy").hidden = true;
+  PREVIEW.go("ready");
 }
 // 断面: モデルの真ん中で手前半分を切り落とす (変換前・変換後の両方)
 function applyCut(render = true) {
@@ -4761,9 +4866,16 @@ function selectTab(name) {
     $("tabbtn-" + t).setAttribute("aria-selected", String(t === name));
     $("tab-" + t).hidden = t !== name;
   }
+  S.tab = name;
+  setUi("tab", name);
   document.body.classList.toggle("tab-build-on", name === "build");  // 道具のバーは、つくるタブの間だけ出す
   _setTbH();
-  if (name !== "build") closePane();
+  cancelGesture();
+  if (name !== "build") {
+    closePane();
+    // 道具のバーが見えないタブでは「選ぶ」に戻す (見えないまま、クリックで置いたり消したりしないように)
+    if (S.tool !== "select") setTool("select");
+  }
   try { localStorage.setItem("pocchi-kobo-tab", name); } catch { /* 覚えなくても困らない */ }
   if (name === "list") renderList();
 }
@@ -4830,8 +4942,8 @@ function wire() {
     e.target.value = "";
   };
   $("xp-q").oninput = () => { clearTimeout(_xpTimer); _xpTimer = setTimeout(xpSearch, 150); };
-  for (const b of $$("[data-tool]")) b.onclick = () => setTool(b.dataset.tool);
-  for (const b of $$("[data-open]")) b.onclick = () => openPane(b.dataset.open);
+  for (const b of $$("button[data-tool]")) b.onclick = () => setTool(b.dataset.tool);
+  for (const b of $$("button[data-open]")) b.onclick = () => openPane(b.dataset.open);
   $("drawer-close").onclick = closePane;
   $("sel-color").onclick = () => selectWhere((p, b) => p.color === b.color, "同じ色");
   $("sel-layer").onclick = () => selectWhere((p, b) => partBottom(p) === partBottom(b), "この段");
@@ -4867,7 +4979,7 @@ function wire() {
   $("piece-num").onchange = (e) => { stopPlay(); setPiece(Number(e.target.value)); };
   $("btn-play").onclick = togglePlay;
   $("play-speed").onchange = (e) => { S.interval = Math.max(0.02, Math.min(2, Number(e.target.value) || 0.15)); e.target.value = S.interval; };
-  $("btn-showall").onclick = () => { stopPlay(); S.layer = 0; S.piece = 0; refreshView(); refreshOrder(); };
+  $("btn-showall").onclick = () => { showAll(); refreshView(); refreshOrder(); };
   $("btn-export-shown").onclick = () => doExport("ldr", safeName(S.lastName), previewParts(), previewSuffix()[0]);
   $("btn-export-layers").onclick = exportLayers;
   // 変換
@@ -4894,7 +5006,7 @@ function wire() {
     } catch (e) { setBusy(null); toast(`作れませんでした: ${e.message || e}`, "err"); }
   };
   // 視点
-  for (const b of $$("[data-view]")) b.onclick = () => frameView(b.dataset.view);
+  for (const b of $$("button[data-view]")) b.onclick = () => frameView(b.dataset.view);
   // ドラッグ & ドロップ
   const stage = $("stage");
   let depth = 0;
@@ -4908,6 +5020,9 @@ function wire() {
 function onKey(e) {
   if (e.target.closest && e.target.closest("input, select, textarea, dialog[open]")) return;
   if ([...document.querySelectorAll("dialog")].some((d) => d.open)) return;
+  // 操作の途中 (つかんで動かす・なぞる・範囲) は Esc だけ受ける。処理中は何も受けない
+  if (!GESTURE.is("idle")) { if (e.key === "Escape") cancelGesture(true); e.preventDefault(); return; }
+  if (_busy) return;
   const k = e.key, ctrl = e.ctrlKey || e.metaKey;
   const handled = () => e.preventDefault();
   if (ctrl && (k === "z" || k === "Z")) { handled(); return e.shiftKey ? redo() : undo(); }
@@ -4925,7 +5040,8 @@ function onKey(e) {
     return rotateSelected();
   }
   if (k === "Delete" || k === "Backspace") { handled(); return deleteSelected(); }
-  if (k === "Escape") { if (DRAG.on) return endDrag(false); if (openPaneKey) return closePane(); if (S.tool !== "select") return setTool("select"); return clearSelection(); }
+  // Esc は内側から順に 1 つずつ戻る: (操作の途中 →) 引き出し → 道具 → 選択
+  if (k === "Escape") { if (openPaneKey) return closePane(); if (S.tool !== "select") return setTool("select"); return clearSelection(); }
   if (k === "p" || k === "P") return setPlacing(!S.placing);
   const toolKeys = { v: "select", m: "box", b: "paint", i: "pick", e: "erase" };
   if (toolKeys[k.toLowerCase()]) return setTool(toolKeys[k.toLowerCase()]);
@@ -4967,6 +5083,14 @@ function setupMobileHeader() {
 
 // ---------------------------------------------------------------- はじまり
 async function start() {
+  // 状態の初期値を body の data-* に出す (この後は、変わるたびに各状態機械・関数が書き換える)
+  for (const [k, v] of Object.entries({ gesture: GESTURE.state, tool: S.tool, pane: "", busy: "0", view: "all", playing: "0", tab: S.tab || "build" })) setUi(k, v);
+  $("dlg-convert").dataset.preview = PREVIEW.state;
+  // 変換の画面を閉じたら、予定していた・計算中のプレビューはやめる
+  // (close イベントは裏のタブで遅れることがあるので、ボタンで閉じたとき = submit でも止める)
+  const stopPreview = () => { clearTimeout(PV.timer); PV.seq++; PREVIEW.go("idle"); };
+  $("dlg-convert").addEventListener("close", stopPreview);
+  $("cv-form").addEventListener("submit", () => setTimeout(stopPreview, 0));  // 「変換する」が結果を使った後で
   buildConvertDialog();
   wire();
   setupMobileHeader();
@@ -4995,7 +5119,35 @@ async function start() {
   }
 }
 // 動作確認用 (開発者ツールから触れるように)
-window.__pocchi = { S, steps, setLayer, setPiece, layerStep, pieceStep, togglePlay, runConvert, reconvert, openFiles, openSample,
+// いまの状態をまとめて返す (自動操作・テスト用。読むだけ)
+function appState() {
+  const st = steps();
+  const open = $$("dialog").find((d) => d.open);
+  return {
+    tab: S.tab, tool: S.tool, gesture: GESTURE.state, pane: openPaneKey, busy: _busy, dialog: open ? open.id : null,
+    view: { ...viewState(), layers: st.levels.length, pieces: S.parts.length },
+    preview: PREVIEW.state, clear: CLEAR.state,
+    parts: S.parts.length, selected: S.sel.size, active: S.active, color: S.color, part: currentPart(),
+    canUndo: undoStack.length > 0, canRedo: redoStack.length > 0,
+    models: [...S.groups.keys()].map((name) => ({ name, source: S.sources.has(name) ? "ready" : _restoring ? "restoring" : "missing" })),
+    library: hasLdrawLibrary(),
+  };
+}
+// 処理・操作・プレビューの計算が終わるまで待つ (自動操作・テスト用)
+function whenIdle(timeout = 20000) {
+  const t0 = Date.now();
+  return new Promise((resolve, reject) => {
+    const tick = () => {
+      if (!_busy && GESTURE.is("idle") && !PREVIEW.is("scheduled", "computing") && !_restoring) return resolve(appState());
+      if (Date.now() - t0 > timeout) return reject(new Error("whenIdle: 時間切れ " + JSON.stringify(appState())));
+      setTimeout(tick, 40);
+    };
+    tick();
+  });
+}
+window.__pocchi = { state: appState, whenIdle, machines: { gesture: GESTURE, preview: PREVIEW, clear: CLEAR }, cancelGesture,
+  setTab: (name) => selectTab(name), openPane, closePane, showAll: () => { showAll(); refreshView(); refreshOrder(); },
+  S, steps, setLayer, setPiece, layerStep, pieceStep, togglePlay, runConvert, reconvert, openFiles, openSample,
   exportZip, checkParts, undo, redo, addPart, moveSelected, rotateSelected, deleteSelected, duplicateSelected, setPlacing,
   placeTarget: () => placeTarget(), updateGhost, placeGhost, frameView, renderList, previewParts, convertModel, JSZip,
   DRAG, CV, renderer, detectSymmetry, voxelizeModel, setTool, selectWhere, selectConnected, replaceSelected, splitSelected,
