@@ -89,7 +89,7 @@ button, input, select { font: inherit; color: inherit; }
 .brand-name { font-family: var(--font-display); font-weight: 800; font-size: 22px; letter-spacing: .02em; line-height: 1; }
 .brand-tag { font-size: 12px; font-weight: 700; opacity: .75; }
 .topnav { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
-.tbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 999px;
+.tbtn { display: inline-flex; align-items: center; gap: 6px; min-height: 38px; padding: 0 14px; border-radius: 999px; white-space: nowrap; flex: none;
   border: 2px solid #16181B; background: transparent; color: #16181B; font-family: var(--font-display); font-weight: 700; cursor: pointer; }
 .tbtn:hover { background: rgb(255 255 255 / .45); }
 .tbtn.solid { background: #16181B; color: var(--sun); }
@@ -188,6 +188,8 @@ input[type="range"] { accent-color: var(--brick); min-width: 0; }
 .stepper .lbl { font-size: 13px; color: var(--ink); }
 .stepper .btn { width: 38px; padding: 0; }
 .stepper input { text-align: center; }
+#btn-play { white-space: nowrap; padding: 0 10px; }
+#play-speed { width: 64px; }
 .readout { border-radius: var(--r); background: var(--tray); padding: 10px 12px; display: grid; gap: 2px; font-variant-numeric: tabular-nums; }
 .readout b { font-family: var(--font-display); font-size: 18px; }
 .readout .warn { color: var(--warn); font-weight: 700; font-size: 12px; }
@@ -250,7 +252,9 @@ dialog::backdrop { background: rgb(10 12 16 / .55); }
 .dlg-head h2 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 18px; }
 .dlg-head .x { margin-left: auto; }
 .dlg-body { overflow-y: auto; padding: 16px 18px; display: grid; gap: 16px; }
-.dlg-foot { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.dlg-foot { padding: 12px 18px; border-top: 1px solid var(--line); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; align-items: center; }
+.foot-warn { margin: 0 auto 0 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12px; font-weight: 700; color: var(--warn); }
+.foot-warn .btn { min-height: 30px; font-size: 12px; padding: 0 10px; }
 .box { border: 1.5px solid var(--line); border-radius: var(--r); padding: 12px; display: grid; gap: 10px; }
 .box h4 { margin: 0; font-family: var(--font-display); font-weight: 800; font-size: 14px; }
 .picks { display: grid; grid-template-columns: repeat(auto-fill, minmax(78px, 1fr)); gap: 4px 10px; }
@@ -290,6 +294,29 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 .tool .ti { font-size: 18px; line-height: 1; }
 .tool .kbd { font-size: 10px; }
 .tool[aria-pressed="true"] { background: var(--sun); border-color: #16181B; color: #16181B; }
+/* AR モード: カメラの映像を作業台いっぱいに (はみ出す分は切る)、その上に透明な 3D を重ねる */
+.ar-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+.ar-on .views, .ar-on .empty { display: none; }
+.ar-handles { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
+.ar-handle { position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; border-radius: 50%; border: 3px solid #16181B;
+  background: var(--sun); color: #16181B; font-weight: 800; font-size: 13px; pointer-events: auto; cursor: grab; touch-action: none;
+  box-shadow: 0 0 0 2px #fff, var(--shadow); padding: 0; }
+.ar-guide { position: absolute; left: 50%; top: 8px; transform: translateX(-50%); width: min(520px, calc(100% - 16px)); z-index: 6;
+  background: var(--paper); border-radius: 12px; border-top: 4px solid var(--sun); box-shadow: var(--shadow); padding: 8px 12px; display: grid; gap: 6px; }
+.ar-guide .row { gap: 6px; }
+.ar-guide .btn, .ar-guide .input { min-height: 32px; font-size: 12px; }
+/* 四隅を押している間は、道具のバーは使えないので隠す (映像を広く見せる) */
+body[data-ui-ar="calibrating"] .toolbar, body[data-ui-ar="starting"] .toolbar { display: none; }
+.ar-guide b { font-family: var(--font-display); font-size: 15px; }
+.arbar { position: absolute; right: 12px; bottom: 12px; left: 12px; max-width: 760px; margin-left: auto; z-index: 6; background: var(--chip);
+  border-radius: 14px; box-shadow: var(--shadow); padding: 8px 10px; display: grid; gap: 6px; font-size: 12px; font-weight: 700; }
+.arbar .row { gap: 6px; }
+.arbar .btn, .arbar .input { min-height: 32px; font-size: 12px; }
+.arbar .input { width: auto; }
+.modesw button { padding: 6px 14px; font-size: 13px; font-family: var(--font-display); white-space: nowrap; }
+.modesw { border-color: #16181B; background: rgb(255 255 255 / .35); flex: none; }
+.modesw button[aria-pressed="true"] { background: #16181B; color: var(--sun); }
+.modesw button:disabled { opacity: .4; cursor: default; }
 .boxsel { position: absolute; border: 2px dashed var(--sel); background: rgb(255 138 0 / .12); pointer-events: none; z-index: 3; }
 /* つくるタブ: 道具はアイコンだけ、ほかの道具は名前の一覧。押すと作業台の上の引き出しに出る */
 /* 道具のバー: つくるタブの間、作業台の上にずっと出す */
@@ -300,7 +327,7 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 .toolbar .tool { display: flex; align-items: center; gap: 5px; padding: 6px 9px; border-radius: 9px; font-size: 12px; }
 .toolbar .tool .ti { font-size: 16px; }
 .toolbar .tool .kbd { display: none; }
-.toolbar .tool-hint { margin: 0; font-size: 11px; line-height: 1.35; min-width: 0; color: var(--muted); }
+.toolbar .tool-hint { margin: 0; font-size: 12px; line-height: 1.35; min-width: 0; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 /* バーが出ているときは、引き出しと左上の表示をその下へ */
 .tab-build-on .drawer { top: calc(var(--tb-h, 54px) + 16px); max-height: calc(100% - var(--tb-h, 54px) - 28px); }
 .tab-build-on .hud { top: calc(var(--tb-h, 54px) + 16px); }
@@ -341,10 +368,18 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
     transition: max-height .2s ease, opacity .2s ease, margin .2s ease; }
   .nav-hidden .topnav { max-height: 0; opacity: 0; margin-top: -8px; pointer-events: none; }
   .topnav .tbtn { padding: 0 11px; min-height: 36px; font-size: 13px; }
+  @media (max-width: 400px) { .topnav .tbtn:not(.icon) > svg:first-child { display: none; } .topnav .tbtn { padding: 0 10px; } }
+  /* タブは画面の下に固定 (スクロールしても、いつでも押せる) */
+  .app { padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px)); }
+  .tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 8; padding: 0 0 env(safe-area-inset-bottom, 0px); gap: 0;
+    background: var(--paper); border-top: 1px solid var(--line); box-shadow: 0 -4px 14px rgb(0 0 0 / .08); }
+  .tab { border-radius: 0; min-height: 56px; font-size: 13px; border-bottom: 0; border-top: 3px solid transparent; }
+  .tab[aria-selected="true"] { background: var(--paper); border-top-color: var(--brick); }
   .topnav .tbtn.icon { width: 36px; padding: 0; }
   #btn-undo, #btn-redo { display: none; }  /* スマホでは「動かす」欄の戻す・やり直すを使う */
   /* お知らせは作業台の右上に小さく */
   .toasts { left: auto; right: 8px; top: 8px; bottom: auto; transform: none; width: min(230px, 64%); gap: 4px; }
+  .tab-build-on .toasts { top: calc(var(--tb-h, 54px) + 16px); }  /* 道具のバーに重ねない */
   .toast { font-size: 11px; line-height: 1.4; padding: 5px 8px; border-radius: 8px; gap: 6px; opacity: .94; }
   .toast.warn, .toast.err { border-left-width: 4px; }
   .toast button { font-size: 12px; padding: 0 2px; }
@@ -354,6 +389,12 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
   .side { border-right: 0; border-top: 1px solid var(--line); }
   .panels { overflow: visible; }
   .brand-tag .tag-more { display: none; }  /* スマホでは「非公式のファンツール」だけ */
+  .brand-name { font-size: 18px; }
+  .brand svg { width: 32px; height: 32px; }
+  .top { column-gap: 8px; }
+  .modesw button { padding: 4px 8px; font-size: 12px; }
+  .ar-guide .hint { display: none; }  /* 狭い画面では説明を省いて、映像を広く */
+  .arbar { left: 8px; right: 8px; bottom: 8px; }
   .tbtn .lbl-wide { display: none; }
   .status .legal { margin-left: 0; }
 }
@@ -372,6 +413,10 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
         <div class="brand-name">デジタルレゴブロック</div>
         <div class="brand-tag">非公式のファンツール<span class="tag-more"> · 3D モデルをブロックで組み立てる</span></div>
       </div>
+    </div>
+    <div class="seg modesw" role="group" aria-label="モード">
+      <button type="button" data-mode="digital" aria-pressed="true" title="画面の中の基礎板で組み立てる">デジタル</button>
+      <button type="button" data-mode="ar" aria-pressed="false" title="Web カメラに映した本物の基礎板の上に重ねて見る">AR</button>
     </div>
     <nav class="topnav" aria-label="ファイル">
       <button class="tbtn solid" id="btn-open" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg><span>ひらく</span></button>
@@ -518,7 +563,24 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
     </aside>
 
     <section class="stage" id="stage" aria-label="作業台">
+      <video id="ar-video" class="ar-video" playsinline muted hidden></video>
       <canvas id="view"></canvas>
+      <div class="ar-handles" id="ar-handles"></div>
+      <div class="ar-guide" id="ar-guide" hidden>
+        <b id="ar-guide-text">基礎板の四隅を押してください (0 / 4)</b>
+        <p class="hint">カメラに本物の基礎板を映して、四隅のかどを 1 つずつ押します (順番は自由)。押した印はドラッグで動かせます。合わせた後は、カメラと基礎板を動かさないでください。</p>
+        <div class="row"><select class="input grow" id="ar-plate" aria-label="基礎板の大きさ"></select><button class="btn" id="ar-undo-tap" type="button">1 つ戻す</button><button class="btn" id="ar-cancel" type="button">やめる</button></div>
+      </div>
+      <div class="arbar" id="arbar" hidden>
+        <span id="arbar-text"></span>
+        <div class="row">
+          <select class="input" id="arbar-plate" aria-label="基礎板の大きさ"></select>
+          <button class="btn" id="ar-rotate" type="button" title="モデルの向きを基礎板の上で回す">向きを回す</button>
+          <label class="check"><input type="checkbox" id="ar-marks" checked><span>目印</span></label>
+          <button class="btn" id="ar-redo" type="button">合わせ直す</button>
+          <button class="btn" id="ar-exit" type="button">デジタルに戻る</button>
+        </div>
+      </div>
       <div class="toolbar" id="toolbar" aria-label="道具">
         <div class="tools" role="group" aria-label="道具">
               <button class="tool" type="button" data-tool="select" aria-pressed="true" title="選ぶ (V)" aria-label="選ぶ"><span class="ti">↖</span><span class="tl">選ぶ</span><span class="kbd">V</span></button>
@@ -528,7 +590,7 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
               <button class="tool" type="button" data-tool="pick" aria-pressed="false" title="スポイト (I)" aria-label="スポイト"><span class="ti">💧</span><span class="tl">スポイト</span><span class="kbd">I</span></button>
               <button class="tool" type="button" data-tool="erase" aria-pressed="false" title="消しゴム (E)" aria-label="消しゴム"><span class="ti">⌫</span><span class="tl">消しゴム</span><span class="kbd">E</span></button>
             </div>
-        <p class="hint tool-hint" id="tool-hint">パーツをクリックして選びます。Shift+クリックで選択に足す・外す。</p>
+        <p class="hint tool-hint" id="tool-hint" title="パーツをクリックして選びます。Shift+クリックで選択に足す・外す。Shift+ドラッグでつかんで動かす。">クリックで選ぶ ・ Shift+ドラッグで動かす</p>
       </div>
       <div class="drawer" id="drawer" hidden>
         <div class="drawer-head"><b id="drawer-title"></b><button class="btn x" id="drawer-close" type="button" aria-label="閉じる">×</button></div>
@@ -637,10 +699,10 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
         <label class="check"><input type="checkbox" id="cv-hollow"><span>中を空ける (表面だけ) <small class="hint">パーツ数を減らす。外から見た形は同じ</small></span></label>
         <label class="check"><input type="checkbox" id="cv-basic"><span>色メニューの 13 色だけ使う <small class="hint">オフなら、今売られている主な 40 色から近い色を選ぶ</small></span></label>
         <label class="check"><input type="checkbox" id="cv-bu"><span>下から積めるパーツだけにする <small class="hint">上の部品の下側に付けるしかないパーツを入れない。形の下側が少し欠ける</small></span></label>
-        <label class="check"><input type="checkbox" id="cv-sym"><span>左右対称にそろえる <small class="hint" id="cv-sym-hint">形と部品の並べ方を鏡写しにする</small></span></label>
+        <label class="check"><input type="checkbox" id="cv-sym"><span>左右で同じ形にそろえる <small class="hint" id="cv-sym-hint">形と部品の並べ方を鏡写しにする</small></span></label>
         <select class="input" id="cv-sym-axis" aria-label="折り返す向き">
-          <option value="y">Y (奥行き) の真ん中で折り返す</option>
-          <option value="x">X (横) の真ん中で折り返す</option>
+          <option value="y">手前と奥を同じ形にする</option>
+          <option value="x">左と右を同じ形にする</option>
         </select>
         <div class="row"><label class="lbl" for="cv-smooth">なめらかにする</label>
           <select class="input grow" id="cv-smooth"><option value="0">しない</option><option value="1">弱 (とげ・細い棒を削り、小さなくぼみを埋める)</option><option value="2">強 (1 マス厚の縁も削る)</option></select></div>
@@ -667,6 +729,7 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
       </div>
     </div>
     <div class="dlg-foot">
+      <p class="foot-warn" id="cv-replace-warn" hidden><span id="cv-replace-text"></span><button class="btn" type="button" id="cv-side-by-side">消さずに横に並べる</button></p>
       <button class="btn" value="cancel" type="submit">キャンセル</button>
       <button class="btn primary" value="ok" type="submit" id="cv-ok">変換する</button>
     </div>
@@ -821,6 +884,23 @@ function roundTo(x, nd) { const f = 10 ** nd; return pyRound(x * f) / f; }
 const MENU_COLORS = [0, 1, 2, 4, 10, 14, 15, 19, 25, 27, 70, 71, 72];  // 色メニューの 13 色
 const COMMON_COLORS = [0, 1, 2, 4, 5, 10, 14, 15, 19, 25, 26, 27, 28, 29, 30, 31, 70, 71, 72, 73, 78, 84, 85, 92,
   151, 191, 212, 226, 272, 288, 308, 320, 321, 322, 323, 326, 330, 378, 379, 484];
+// 画面に出す日本語の色名 (書き出すファイルの中は LDraw の英語名のまま)
+const COLOR_JA = {
+  0: "黒", 1: "青", 2: "緑", 4: "赤", 5: "濃いピンク", 10: "明るい緑", 14: "黄", 15: "白", 19: "ベージュ", 25: "オレンジ",
+  26: "マゼンタ", 27: "ライム", 28: "濃いベージュ", 29: "明るいピンク", 30: "濃いラベンダー", 31: "ラベンダー", 70: "茶色",
+  71: "明るい灰色", 72: "濃い灰色", 73: "中間の青", 78: "うすい肌色", 84: "濃い肌色", 85: "ライラック", 92: "肌色",
+  151: "とても明るい灰色", 191: "明るいオレンジ", 212: "明るい青", 226: "クリーム色", 272: "紺", 288: "深緑", 308: "こげ茶",
+  320: "えんじ", 321: "濃い空色", 322: "空色", 323: "うすい水色", 326: "黄緑", 330: "オリーブ", 378: "くすんだ緑",
+  379: "くすんだ青", 484: "濃いオレンジ",
+};
+function colorJa(code) { return COLOR_JA[code] || colorInfo(code)[0].replace(/_/g, " "); }
+// 画面に出す日本語の部品名 (ブリック 1×8 など)。拡張パーツは元の名前
+function partNameJa(part) {
+  const i = PART_INFO.get(part);
+  if (!i) return partName(part);
+  if (i.shape === "round") return "丸ブリック 1×1";
+  return `${i.height === PLATE_H ? "プレート" : "ブリック"} ${i.width}×${i.length}`;
+}
 const DIRECT_COLOR = 0x2000000;
 function colorInfo(code) {
   const c = (typeof COLOR_TABLE !== "undefined") && COLOR_TABLE[code];
@@ -1491,7 +1571,94 @@ function csvText(rows) {
 //   states: 状態 → そこから行ける状態のリスト。表にない移り変わりは行わず、警告して false を返す (例外は投げない)
 //   go(next, data): 移る。同じ状態への go は data だけ差し替える
 //   is(...names) / can(next) / state / data / history (直近 30 回) / table (移り変わりの表)
-function createMachine(name, { initial, states, onChange = null }) {
+// ---------------------------------------------------------------- AR: 写真の四隅からカメラの位置・向きを求める
+// 4 点が、ねじれていない凸の四角形を順に回っているか (どの角も同じ向きに曲がり、つぶれていない)
+function isConvexQuad(p) {
+  let sign = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = p[i], b = p[(i + 1) % 4], c = p[(i + 2) % 4];
+    const cr = (b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]);
+    if (Math.abs(cr) < 1e-6) return false;
+    if (sign && Math.sign(cr) !== sign) return false;
+    sign = Math.sign(cr);
+  }
+  return true;
+}
+// 押した 4 点を、画面で時計回り (右回り) に並べ、左上に近い点から始める
+function orderQuad(p) {
+  const cx = p.reduce((s, q) => s + q[0], 0) / 4, cy = p.reduce((s, q) => s + q[1], 0) / 4;
+  const q = [...p].sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));  // 画面は下が +y なので、角度が増える = 右回り
+  let s = 0;
+  for (let i = 1; i < 4; i++) if (q[i][0] + q[i][1] < q[s][0] + q[s][1]) s = i;
+  return [...q.slice(s), ...q.slice(0, s)];
+}
+// solveHomography: 平面の 4 点 src[i]=[X,Y] が、画面の 4 点 dst[i]=[u,v] に写る 3x3 の変換 (h33 = 1)。行の配列で返す
+function solveHomography(src, dst) {
+  const A = [], b = [];
+  for (let i = 0; i < 4; i++) {
+    const [X, Y] = src[i], [u, v] = dst[i];
+    A.push([X, Y, 1, 0, 0, 0, -u * X, -u * Y]); b.push(u);
+    A.push([0, 0, 0, X, Y, 1, -v * X, -v * Y]); b.push(v);
+  }
+  // ガウスの消去法 (部分ピボット)
+  for (let c = 0; c < 8; c++) {
+    let p = c;
+    for (let r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+    if (Math.abs(A[p][c]) < 1e-12) return null;  // 3 点が一直線など
+    [A[c], A[p]] = [A[p], A[c]]; [b[c], b[p]] = [b[p], b[c]];
+    for (let r = 0; r < 8; r++) {
+      if (r === c) continue;
+      const k = A[r][c] / A[c][c];
+      if (!k) continue;
+      for (let j = c; j < 8; j++) A[r][j] -= k * A[c][j];
+      b[r] -= k * b[c];
+    }
+  }
+  const h = b.map((v, i) => v / A[i][i]);
+  return [[h[0], h[1], h[2]], [h[3], h[4], h[5]], [h[6], h[7], 1]];
+}
+// planarPose: 床の上の長方形の四隅 world[i]=[X,Z] (Y=0 の床) が、画面の img[i]=[u,v] に見えている。
+//   画面の座標は、画面の真ん中を 0 にしたピクセル (右が +u、下が +v)。
+//   カメラの焦点距離 f (ピクセル) も四隅から推定する (真上から見ていて決まらないときは fDefault)。
+//   返す R は「床の x・y・z 軸が、カメラから見てどちらを向くか」(カメラ: 右 +x・下 +y・奥 +z) の 3x3 (行の配列)、t はカメラから見た床の原点。
+//   err: 推定の食い違い (0 に近いほど、長方形として素直に見えている。縦横を取り違えると大きくなる)
+function planarPose(img, world, { fDefault = 1000, fMin = 100, fMax = 1e5 } = {}) {
+  if (!isConvexQuad(img)) return null;  // 同じ所を 2 回押した・順番がねじれている
+  const H = solveHomography(world, img);
+  if (!H) return null;
+  const [[h11, h12, h13], [h21, h22, h23], [h31, h32, h33]] = H;
+  // 床の x 軸・z 軸の向きは直角で、長さが同じ → f が決まる (2 つの式)
+  const ests = [];
+  const d1 = h31 * h32;
+  if (Math.abs(d1) > 1e-12) { const f2 = -(h11 * h12 + h21 * h22) / d1; if (f2 > 0) ests.push([Math.sqrt(f2), Math.abs(d1)]); }
+  const d2 = h31 * h31 - h32 * h32;
+  if (Math.abs(d2) > 1e-12) { const f2 = (h12 * h12 + h22 * h22 - h11 * h11 - h21 * h21) / d2; if (f2 > 0) ests.push([Math.sqrt(f2), Math.abs(d2)]); }
+  let f = fDefault, estimated = false;
+  if (ests.length) {
+    const wsum = ests.reduce((s, [, w]) => s + w, 0);
+    const fe = ests.reduce((s, [v, w]) => s + v * w, 0) / wsum;
+    if (fe >= fMin && fe <= fMax) { f = fe; estimated = true; }
+  }
+  const col = (j) => [H[0][j] / f, H[1][j] / f, H[2][j]];
+  const a1 = col(0), a2 = col(1), a3 = col(2);
+  const len = (v) => Math.hypot(v[0], v[1], v[2]);
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const n1 = len(a1), n2 = len(a2);
+  let lam = 2 / (n1 + n2);
+  if (a3[2] * lam < 0) lam = -lam;  // 床はカメラの前 (奥) にある
+  let rx = a1.map((v) => v * lam), rz = a2.map((v) => v * lam);
+  const t = a3.map((v) => v * lam);
+  // 直角にそろえる
+  const nx = len(rx); rx = rx.map((v) => v / nx);
+  const k = dot(rz, rx); rz = rz.map((v, i) => v - k * rx[i]);
+  const nz = len(rz); rz = rz.map((v) => v / nz);
+  const ry = [rz[1] * rx[2] - rz[2] * rx[1], rz[2] * rx[0] - rz[0] * rx[2], rz[0] * rx[1] - rz[1] * rx[0]];  // y = z × x
+  const R = [[rx[0], ry[0], rz[0]], [rx[1], ry[1], rz[1]], [rx[2], ry[2], rz[2]]];
+  const err = Math.abs(dot(a1, a2)) / (n1 * n2) + Math.abs(n1 - n2) / Math.max(n1, n2);
+  return { f, estimated, R, t, err };
+}
+
+function createMachine(name,{ initial, states, onChange = null }) {
   const m = {
     name, state: initial, data: null, table: states, history: [],
     is: (...names) => names.includes(m.state),
@@ -1520,6 +1687,7 @@ if (typeof module !== "undefined") {
     STUD, PLATE_H, BRICK_H, PARTS, PART_INFO, partDims, partHeight, packRectangles, packLayers, packVoxels,
     fillLeftovers, boxParts, buildSequence, bottomUpBuildable, checkBuild, partCells, partBottom, ldrawText,
     ldrawLine, parseLdr, countParts, csvText, pyRound, EXT_PARTS, connectFloating, partGroups, createMachine,
+    colorJa, partNameJa, solveHomography, planarPose, isConvexQuad, orderQuad,
   };
 }
 
@@ -3079,7 +3247,7 @@ async function restoreSources() {
 
 // ---------------------------------------------------------------- 3D
 const canvas = $("view");
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer: false });
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: false });  // alpha: AR でカメラの映像を後ろに透かす
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 2000);
@@ -3360,12 +3528,14 @@ function resize() {
   camera.aspect = Math.max(1, r.width) / Math.max(1, r.height);
   camera.updateProjectionMatrix();
   needRender = true;
+  arRelayout();
 }
 new ResizeObserver(resize).observe($("stage"));
 controls.addEventListener("change", () => { needRender = true; });
 function loop() {
   requestAnimationFrame(loop);
-  controls.update();
+  if (arActive()) applyArPose();  // AR: 視点は基礎板に合わせたカメラのまま
+  else controls.update();
   if (!needRender) return;
   needRender = false;
   fill.position.copy(camera.position).sub(controls.target).normalize().multiplyScalar(30).add(controls.target);
@@ -3612,7 +3782,15 @@ function placeGhost() {
     S.sel = new Set([p.id]); S.active = p.id;
   });
 }
-const TOOL_HINTS = {
+const TOOL_TIPS = {  // 道具のバーに出す 1 行
+  select: "クリックで選ぶ ・ Shift+ドラッグで動かす",
+  box: "ドラッグで囲んで選ぶ ・ Ctrl で足す",
+  place: "クリックで置く ・ R で回す",
+  paint: "クリック・なぞって塗る",
+  pick: "クリックで色を拾う",
+  erase: "クリック・なぞって消す ・ Ctrl+Z で戻す",
+};
+const TOOL_HINTS = {  // くわしい説明 (マウスを乗せると出る)
   select: "パーツをクリックして選びます。Shift+クリックで選択に足す・外す。Shift+ドラッグでつかんで動かす。",
   box: "ドラッグで四角く囲んだパーツを選びます (Ctrl を押しながらで、今の選択に足す)。",
   place: "部品と色を選んで、基礎板やパーツの上をクリックすると置けます。R で回す。",
@@ -3650,7 +3828,8 @@ function setTool(t) {
   S.tool = t;
   setUi("tool", t);
   for (const b of $$("button[data-tool]")) b.setAttribute("aria-pressed", String(b.dataset.tool === t));
-  $("tool-hint").textContent = TOOL_HINTS[t];
+  $("tool-hint").textContent = TOOL_TIPS[t];
+  $("tool-hint").title = TOOL_HINTS[t];
   if ((t === "paint" || t === "pick") && openPaneKey !== "color") openPane("color", false);  // 塗るときは色を出しておく
   syncPlacing();
   refreshHud();
@@ -3865,7 +4044,7 @@ canvas.addEventListener("pointerdown", (ev) => {
     ev.preventDefault(); ev.stopImmediatePropagation();
     S.color = got.part.color;
     renderSwatches(); saveLocal();
-    toast(`色を拾いました: ${colorInfo(S.color)[0].replace(/_/g, " ")} (${S.color})`, "info", 2500);
+    toast(`色を拾いました: ${colorJa(S.color)}`, "info", 2500);
     setTool(S.prevTool && S.prevTool !== "pick" ? S.prevTool : "paint");
   } else if (t === "box") {
     ev.preventDefault(); ev.stopImmediatePropagation();
@@ -3992,6 +4171,280 @@ function mergeSelected() {
   toast(`${before} 個を ${after} 個にまとめました`, "info", 2500);
 }
 
+
+// ---------------------------------------------------------------- AR モード
+// Web カメラに映した本物の基礎板の四隅を押すと、その上にモデルを重ねて表示する。
+// 押した四隅 (画面の位置) と基礎板の大きさ (ポッチの数) から、カメラの位置・向き・画角を求める (core.js の planarPose)。
+// カメラも基礎板も、合わせた後は動かさない前提 (動いたら「合わせ直す」)。
+//   状態: off → starting (カメラを起こす) → calibrating (四隅を押す) → ready (重ねて表示)。ready → calibrating (合わせ直す)
+const AR_PLATES = [[32, 32], [48, 48], [16, 16], [16, 32], [10, 20], [8, 16], [8, 8]];
+const AR = createMachine("ar", {
+  initial: "off",
+  states: { off: ["starting"], starting: ["calibrating", "off"], calibrating: ["ready", "off"], ready: ["calibrating", "off"] },
+  onChange: (to) => { setUi("ar", to); syncArView(); },
+});
+const AR_DATA = {
+  stream: null,
+  taps: [],         // 押した所 (映像の中の位置。0〜1)。4 つそろうと、左上から右回りに並べ直す
+  k: 0,             // どの角を基礎板のどの角に合わせるか (向きを回すと変わる)
+  plate: [32, 32],  // 基礎板の大きさ [横, 奥行き] (ポッチ)
+  marks: true,      // 合わせの目印 (縁・ポッチの位置) を出す
+  pose: null,       // 求めたカメラ { f, R, t, estimated, err }
+  camMatrix: new THREE.Matrix4(),
+};
+try { const v = JSON.parse(localStorage.getItem("pocchi-kobo-ar") || "null"); if (v && v.plate) AR_DATA.plate = v.plate; if (v && "marks" in v) AR_DATA.marks = !!v.marks; } catch { /* はじめての人 */ }
+function saveArPrefs() { try { localStorage.setItem("pocchi-kobo-ar", JSON.stringify({ plate: AR_DATA.plate, marks: AR_DATA.marks })); } catch { /* 覚えなくても困らない */ } }
+const arActive = () => !AR.is("off");
+
+// 映像は作業台いっぱいに「はみ出して」表示 (object-fit: cover)。映像の中の位置 (0〜1) ⇔ 作業台の上の位置 (px)
+function arCover() {
+  const v = $("ar-video"), r = $("stage").getBoundingClientRect();
+  const vw = v.videoWidth || 1280, vh = v.videoHeight || 720;
+  const s = Math.max(r.width / vw, r.height / vh);
+  const dw = vw * s, dh = vh * s;
+  return { W: r.width, H: r.height, dw, dh, ox: (r.width - dw) / 2, oy: (r.height - dh) / 2, rect: r };
+}
+const arToStage = ([x, y], c = arCover()) => [c.ox + x * c.dw, c.oy + y * c.dh];
+const arFromStage = ([u, v], c = arCover()) => [(u - c.ox) / c.dw, (v - c.oy) / c.dh];
+
+// 基礎板の四隅 (3D の床の上、ポッチの中心が整数の位置。画面の基礎板と同じ並び)。上から見て左奥から右回り
+function arPlateCorners([w, d]) {
+  const x0 = -Math.floor(w / 2) - 0.5, z1 = Math.floor(d / 2) + 0.5;
+  const x1 = x0 + w, z0 = z1 - d;
+  return [[x0, z0], [x1, z0], [x1, z1], [x0, z1]];
+}
+
+// 押した 4 点から、カメラを求める
+function arSolve() {
+  if (AR_DATA.taps.length < 4) return false;
+  const c = arCover();
+  const img = AR_DATA.taps.map((p) => { const [u, v] = arToStage(p, c); return [u - c.W / 2, v - c.H / 2]; });
+  const world = arPlateCorners(AR_DATA.plate);
+  const half = c.dw / 2, deg = Math.PI / 180;
+  const opts = { fDefault: half / Math.tan(31 * deg), fMin: half / Math.tan(55 * deg), fMax: half / Math.tan(10 * deg) };
+  const square = AR_DATA.plate[0] === AR_DATA.plate[1];
+  const solveK = (k) => planarPose(img, img.map((_, i) => world[(i + k) % 4]), opts);
+  let pose = solveK(AR_DATA.k);
+  if (!square && !AR_DATA.kChosen) {
+    // 長方形の板: 長い辺がどちらか分からないので、素直に長方形に見える方を選ぶ
+    const other = solveK(AR_DATA.k + 1);
+    if (other && (!pose || other.err < pose.err)) { AR_DATA.k += 1; pose = other; }
+    AR_DATA.kChosen = true;
+  }
+  if (!pose) { AR_DATA.pose = null; return false; }
+  AR_DATA.pose = pose;
+  const { R, t, f } = pose;
+  // 床 → カメラ (カメラは 右 +x・下 +y・奥 +z)。three.js のカメラは 右 +x・上 +y・手前 +z なので y・z を裏返す
+  AR_DATA.camMatrix.set(
+    R[0][0], R[0][1], R[0][2], t[0],
+    -R[1][0], -R[1][1], -R[1][2], -t[1],
+    -R[2][0], -R[2][1], -R[2][2], -t[2],
+    0, 0, 0, 1).invert();
+  AR_DATA.fov = 2 * Math.atan((c.H / 2) / f) / deg;
+  AR_DATA.aspect = c.W / c.H;  // 求めたときの作業台の形 (画角はこの形で決まる)
+  rebuildArMarks();
+  applyArPose();  // 次の描画を待たずに使う (すぐ後のクリックも、合わせたカメラで当たり判定する)
+  return true;
+}
+// 毎フレーム: 求めたカメラをそのまま使う (視点の操作では動かない)
+function applyArPose() {
+  if (!AR.is("ready") || !AR_DATA.pose) return;
+  AR_DATA.camMatrix.decompose(camera.position, camera.quaternion, camera.scale);
+  camera.updateMatrixWorld(true);
+  if (Math.abs(camera.fov - AR_DATA.fov) > 1e-6 || Math.abs(camera.aspect - AR_DATA.aspect) > 1e-6 || camera.near !== 0.5) {
+    camera.fov = AR_DATA.fov; camera.aspect = AR_DATA.aspect; camera.near = 0.5; camera.far = 5000; camera.updateProjectionMatrix();
+  }
+}
+
+// 合わせの目印: 基礎板の縁と、ポッチの位置の丸 (本物のポッチと重なっていれば、うまく合っている)
+const arMarks = new THREE.Group();
+arMarks.visible = false;
+scene.add(arMarks);
+function rebuildArMarks() {
+  for (const c of [...arMarks.children]) { arMarks.remove(c); c.geometry && c.geometry.dispose(); }
+  const [w, d] = AR_DATA.plate;
+  const cs = arPlateCorners(AR_DATA.plate);
+  const lineMat = new THREE.LineBasicMaterial({ color: 0xffcf00, depthTest: false, transparent: true });
+  const pts = [...cs, cs[0]].map(([x, z]) => new THREE.Vector3(x, 0.02, z));
+  const edge = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), lineMat);
+  edge.renderOrder = 10;
+  arMarks.add(edge);
+  const dot = new THREE.CircleGeometry(0.22, 12);
+  dot.rotateX(-Math.PI / 2);
+  const dotMat = new THREE.MeshBasicMaterial({ color: 0xffcf00, transparent: true, opacity: 0.55, depthWrite: false });
+  const dots = new THREE.InstancedMesh(dot, dotMat, w * d);
+  const x0 = cs[0][0] + 0.5, z0 = cs[0][1] + 0.5;
+  let k = 0;
+  for (let i = 0; i < w; i++) for (let j = 0; j < d; j++) { _m4.makeTranslation(x0 + i, 0.03, z0 + j); dots.setMatrixAt(k++, _m4); }
+  dots.raycast = () => {};
+  arMarks.add(dots);
+  needRender = true;
+}
+
+// 画面の見た目を AR の状態に合わせる
+function syncArView() {
+  const on = arActive(), ready = AR.is("ready"), cal = AR.is("calibrating");
+  setUi("mode", on ? "ar" : "digital");
+  document.body.classList.toggle("ar-on", on);
+  for (const b of $$("button[data-mode]")) b.setAttribute("aria-pressed", String(b.dataset.mode === (on ? "ar" : "digital")));
+  $("ar-video").hidden = !on;
+  $("ar-guide").hidden = !(cal || AR.is("starting"));
+  $("arbar").hidden = !ready;
+  baseGroup.visible = !on;
+  grid.visible = !on && !S.baseplate;
+  arMarks.visible = ready && AR_DATA.marks;
+  // 部品は合わせ終わってから出す (四隅を押している間は、カメラの映像だけ)
+  for (const m of [partsGroup, outlineGroup, overlayGroup, edgeGroup]) m.visible = !on || ready;
+  controls.enableRotate = controls.enableZoom = controls.enablePan = !on;
+  if (on) { scene.background = null; renderer.setClearColor(0x000000, 0); } else themeColors();
+  if (AR.is("starting")) $("ar-guide-text").textContent = "カメラを起こしています…";
+  if (cal) refreshArGuide();
+  if (ready) refreshArBar();
+  renderArHandles();
+  needRender = true;
+}
+function refreshArGuide() {
+  const n = AR_DATA.taps.length;
+  $("ar-guide-text").textContent = n < 4 ? `基礎板の四隅を押してください (${n} / 4)` : "四隅がうまく合いません。押し直してください";
+  $("ar-undo-tap").disabled = !n;
+}
+function refreshArBar() {
+  const [w, d] = AR_DATA.plate, p = AR_DATA.pose;
+  let msg = `基礎板 ${w}×${d} に重ねています。黄色い丸が本物のポッチと重なっていれば OK`;
+  if (p && p.err > 0.15) msg += "。四隅が少しずれているかもしれません (丸の印を動かして直せます)";
+  else if (p && !p.estimated) msg += "。真上に近いので、カメラの画角はおおよそです";
+  $("arbar-text").textContent = msg;
+}
+// 押した所の印 (番号つき)。合わせた後もドラッグで少しずつ直せる
+function renderArHandles() {
+  const box = $("ar-handles");
+  box.textContent = "";
+  const show = AR.is("calibrating") || (AR.is("ready") && AR_DATA.marks);
+  if (!show) return;
+  const c = arCover();
+  AR_DATA.taps.forEach((p, i) => {
+    const [u, v] = arToStage(p, c);
+    const h = document.createElement("button");
+    h.type = "button"; h.className = "ar-handle"; h.textContent = String(i + 1);
+    h.style.left = u + "px"; h.style.top = v + "px";
+    h.setAttribute("aria-label", `${i + 1} つ目の角 (ドラッグで動かせます)`);
+    h.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault(); ev.stopPropagation();
+      try { h.setPointerCapture(ev.pointerId); } catch { /* つかめなくても、印の上で動かせば追いかける */ }
+      const move = (e) => {
+        const r = $("stage").getBoundingClientRect();
+        AR_DATA.taps[i] = arFromStage([e.clientX - r.left, e.clientY - r.top]);
+        h.style.left = (e.clientX - r.left) + "px"; h.style.top = (e.clientY - r.top) + "px";
+        if (AR.is("ready")) { arSolve(); refreshArBar(); needRender = true; }
+      };
+      const up = () => { h.removeEventListener("pointermove", move); h.removeEventListener("pointerup", up); h.removeEventListener("pointercancel", up); };
+      h.addEventListener("pointermove", move); h.addEventListener("pointerup", up); h.addEventListener("pointercancel", up);
+    });
+    box.append(h);
+  });
+}
+function arRelayout() {
+  if (!arActive()) return;
+  if (AR.is("ready")) arSolve();  // 作業台の大きさが変わると、映像の写り方も変わる
+  renderArHandles();
+  needRender = true;
+}
+
+// 四隅を押す (押している間は、ほかの操作に渡さない)
+function arTap(ev) {
+  if (!AR.is("calibrating") || ev.target !== canvas || ev.button !== 0) return;
+  ev.preventDefault(); ev.stopPropagation();
+  const r = $("stage").getBoundingClientRect();
+  if (AR_DATA.taps.length >= 4) AR_DATA.taps = [];
+  AR_DATA.taps.push(arFromStage([ev.clientX - r.left, ev.clientY - r.top]));
+  if (AR_DATA.taps.length === 4) arFinishCorners();
+  else { refreshArGuide(); renderArHandles(); }
+}
+function arFinishCorners() {
+  AR_DATA.taps = orderQuad(AR_DATA.taps);
+  AR_DATA.k = 0; AR_DATA.kChosen = false;
+  if (arSolve()) {
+    AR.go("ready");
+    applyArPose();
+  } else { refreshArGuide(); renderArHandles(); }
+}
+
+async function startAR() {
+  if (arActive()) return;
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+    toast("このブラウザではカメラが使えません", "err", 6000);
+    return;
+  }
+  cancelGesture();
+  if (S.tool !== "select") setTool("select");
+  AR.go("starting");
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
+    });
+    if (!AR.is("starting")) { stream.getTracks().forEach((t) => t.stop()); return; }  // 待っている間にやめた
+    AR_DATA.stream = stream;
+    const v = $("ar-video");
+    v.srcObject = stream;
+    await v.play().catch(() => {});
+    if (!v.videoWidth) await new Promise((r) => { v.onloadedmetadata = r; setTimeout(r, 1500); });
+    AR_DATA.taps = []; AR_DATA.pose = null;
+    AR.go("calibrating");
+  } catch (e) {
+    AR.go("off");
+    const name = e && e.name;
+    const msg = name === "NotAllowedError" || name === "SecurityError"
+      ? "カメラを使えませんでした。ブラウザでカメラを許可してください (このページがほかのページの中に表示されているときは、使えないことがあります。公開サイトで開くと使えます)"
+      : name === "NotFoundError" || name === "OverconstrainedError" ? "カメラが見つかりませんでした"
+      : name === "NotReadableError" ? "カメラをほかのアプリが使っているようです" : "カメラを起こせませんでした";
+    toast(msg, "err", 10000);
+  }
+}
+function stopAR() {
+  if (!arActive()) return;
+  if (AR_DATA.stream) AR_DATA.stream.getTracks().forEach((t) => t.stop());
+  AR_DATA.stream = null;
+  $("ar-video").srcObject = null;
+  AR.go("off");
+  camera.fov = 38;
+  resize();
+  frameView();
+}
+function setMode(mode) { if (mode === "ar") startAR(); else stopAR(); }
+
+function initAR() {
+  for (const b of $$("button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
+  if (!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia)) {
+    const b = $$("button[data-mode]").find((x) => x.dataset.mode === "ar");
+    if (b) { b.disabled = true; b.title = "このブラウザではカメラが使えません"; }
+  }
+  $("stage").addEventListener("pointerdown", arTap, { capture: true });
+  for (const sel of [$("ar-plate"), $("arbar-plate")]) {
+    sel.textContent = "";
+    for (const [w, d] of AR_PLATES) sel.append(new Option(`${w}×${d} ポッチ`, `${w}x${d}`));
+    sel.value = AR_DATA.plate.join("x");
+    sel.onchange = () => {
+      AR_DATA.plate = sel.value.split("x").map(Number);
+      $("ar-plate").value = $("arbar-plate").value = sel.value;
+      AR_DATA.kChosen = false; saveArPrefs();
+      if (AR.is("ready")) { arSolve(); refreshArBar(); }
+    };
+  }
+  $("ar-undo-tap").onclick = () => { AR_DATA.taps.pop(); refreshArGuide(); renderArHandles(); };
+  $("ar-cancel").onclick = () => stopAR();
+  $("ar-redo").onclick = () => { AR_DATA.taps = []; AR_DATA.pose = null; AR.go("calibrating"); };
+  $("ar-rotate").onclick = () => {
+    const square = AR_DATA.plate[0] === AR_DATA.plate[1];
+    AR_DATA.k = (AR_DATA.k + (square ? 1 : 2)) % 4; AR_DATA.kChosen = true;
+    arSolve(); refreshArBar();
+  };
+  $("ar-marks").checked = AR_DATA.marks;
+  $("ar-marks").onchange = (e) => { AR_DATA.marks = e.target.checked; saveArPrefs(); syncArView(); };
+  $("ar-exit").onclick = () => stopAR();
+  $("ar-video").addEventListener("loadedmetadata", arRelayout);
+  setUi("mode", "digital"); setUi("ar", AR.state);
+}
+
 let _down = null;
 canvas.addEventListener("pointerdown", (ev) => { _down = { x: ev.clientX, y: ev.clientY, b: ev.button }; });
 canvas.addEventListener("pointermove", (ev) => { if (S.placing && !(ev.buttons & 1)) updateGhost(ev); });
@@ -4031,8 +4484,8 @@ function refreshHud() {
   const hud = $("hud");
   hud.textContent = "";
   const chip = (text, cls = "") => { const c = document.createElement("span"); c.className = "chip " + cls; c.textContent = text; hud.append(c); };
-  if (S.placing) chip(`置く: ${partName(currentPart())} / ${colorInfo(S.color)[0].replace(/_/g, " ")}`, "mode");
-  else if (S.tool !== "select") chip({ box: "範囲で選ぶ", paint: `塗る: ${colorInfo(S.color)[0].replace(/_/g, " ")}`, pick: "スポイト", erase: "消しゴム" }[S.tool], "mode");
+  if (S.placing) chip(`置く: ${partNameJa(currentPart())}・${colorJa(S.color)}`, "mode");
+  else if (S.tool !== "select") chip({ box: "範囲で選ぶ", paint: `塗る: ${colorJa(S.color)}`, pick: "スポイト", erase: "消しゴム" }[S.tool], "mode");
   const { levels } = steps();
   if (S.piece) chip(`${S.piece} / ${S.parts.length} 個目まで表示`);
   else if (S.layer) chip(`${S.layer} / ${levels.length} 段目まで表示`);
@@ -4090,7 +4543,7 @@ function refreshOrder() {
     const n = Math.min(S.piece, total);
     const [newest, step] = seq[n - 1];
     line(`${n} / ${total} 個目 (${levels.indexOf(step) + 1} / ${L} 段目)`, "b");
-    line(`いま置いた部品: ${partName(newest.part)} / ${colorInfo(newest.color)[0].replace(/_/g, " ")}`);
+    line(`いま置いた部品: ${partNameJa(newest.part)}・${colorJa(newest.color)}`);
     if (hungFromAbove(newest, step)) line("上の部品の下側に付ける", "span", "warn");
   } else if (S.layer && L) {
     const n = Math.min(S.layer, L);
@@ -4111,7 +4564,21 @@ function refreshOrder() {
 }
 
 // ---------------------------------------------------------------- 部品の棚・色
-let _thumbs = new Map();
+let _thumbs = new Map();  // "部品|色" → 絵
+// 棚の絵を今の色で描く (色を変えるたびに。描いた色は覚えておく)
+let _thumbTimer = 0;
+function scheduleShelfThumbs() {
+  clearTimeout(_thumbTimer);
+  _thumbTimer = setTimeout(async () => {
+    const color = S.color;
+    const rows = PARTS.map(([p]) => p).filter((p) => !_thumbs.has(p + "|" + color)).map((p) => ({ part: p, color, qty: 1 }));
+    if (!rows.length) return renderShelf();
+    try {
+      for (const [k, v] of await renderPartImages(rows, 112)) _thumbs.set(k, v);
+      if (S.color === color) renderShelf();
+    } catch (e) { console.warn("thumbnails", e); }
+  }, 150);
+}
 let shelfFilter = "basic";  // はじめは基本の部品 (変換の基本セットと同じ 11 種類)
 function renderShelf() {
   const shelf = $("shelf");
@@ -4123,15 +4590,20 @@ function renderShelf() {
     const b = document.createElement("button");
     b.type = "button"; b.className = "tile";
     b.setAttribute("aria-pressed", String(!S.ext && S.partChoice === part));
-    b.title = `${partName(part)} (${part.replace(".dat", "")})`;
-    const src = _thumbs.get(part + "|1");
+    b.title = `${partNameJa(part)} (${part.replace(".dat", "")})。選ぶと「置く」になります`;
+    const src = _thumbs.get(part + "|" + S.color) || _thumbs.get(part + "|1");
     const img = src ? Object.assign(document.createElement("img"), { src, alt: "" }) : Object.assign(document.createElement("span"), { className: "ph" });
     const t = document.createElement("b");
     t.textContent = shape === "round" ? "1x1 丸" : `${w}x${l}`;
     const sub = document.createElement("span");
     sub.textContent = h === PLATE_H ? "プレート" : "ブリック";
     b.append(img, t, sub);
-    b.onclick = () => { S.partChoice = part; S.ext = null; renderShelf(); refreshExtChip(); refreshHud(); if (S.placing) ghost.visible = false; saveLocal(); };
+    b.onclick = () => {
+      S.partChoice = part; S.ext = null; renderShelf(); refreshExtChip();
+      if (S.placing) ghost.visible = false;
+      else setTool("place");  // 部品を選ぶ = 置きたい。すぐ基礎板の上に見本が出る
+      refreshHud(); saveLocal();
+    };
     shelf.append(b);
   }
 }
@@ -4143,17 +4615,18 @@ function renderSwatches() {
     const b = document.createElement("button");
     b.type = "button"; b.className = "stud";
     b.style.setProperty("--c", "#" + hex);
-    b.title = `${name.replace(/_/g, " ")} (${code})`;
+    b.title = colorJa(code);
     b.setAttribute("aria-label", b.title);
     b.setAttribute("aria-pressed", String(S.color === code));
     b.onclick = () => { S.color = code; renderSwatches(); refreshHud(); saveLocal(); };
     box.append(b);
   }
-  const [name, hex] = colorInfo(S.color);
-  $("color-name").textContent = `${name.replace(/_/g, " ")} (${S.color})`;
+  const [, hex] = colorInfo(S.color);
+  $("color-name").textContent = colorJa(S.color);
   $("paint-dot").style.background = "#" + hex;  // 「色を変える」で塗る色
   $("item-color-dot").style.background = "#" + hex;
-  $("item-color-name").textContent = name.replace(/_/g, " ");
+  $("item-color-name").textContent = colorJa(S.color);
+  scheduleShelfThumbs();  // 棚の絵を今の色で描き直す
 }
 function refreshExtChip() {
   $("ext-chip").hidden = !S.ext;
@@ -4269,6 +4742,8 @@ function buildConvertDialog() {
     schedulePreview();
   });
   $("cv-presets").addEventListener("click", () => schedulePreview());
+  $("cv-replace").addEventListener("change", refreshReplaceWarn);
+  $("cv-side-by-side").onclick = () => { $("cv-replace").checked = false; refreshReplaceWarn(); };
   // 「変換する」: ダイアログの close イベントは裏のタブで遅れることがあるので、送信 (submit) のときに始める
   $("cv-form").addEventListener("submit", (e) => {
     if (!e.submitter || e.submitter.value !== "ok" || !CV.model) return;
@@ -4287,6 +4762,7 @@ function openConvertDialog(model, group = null) {
   $("cv-file").textContent = group ? `${group} (${model.name}${model.ext}) を、今の設定から作り直します。`
     : `${model.name}${model.ext} をブロックに置き換えます。`;
   CV.updateRes();
+  refreshReplaceWarn();
   $("dlg-convert").returnValue = "";
   $("dlg-convert").showModal();
   showPreviewModel(model);
@@ -4337,6 +4813,13 @@ function initPreview() {
   PV.views[0].scene.add(PV.src);
   PV.views[1].scene.add(PV.out);
 }
+// 「変換する」の横: 今あるパーツが消えるときだけ知らせる (横に並べる方へ 1 回で切り替えられる)
+function refreshReplaceWarn() {
+  const n = S.parts.length;
+  const on = !CV.group && n > 0 && $("cv-replace").checked;
+  $("cv-replace-warn").hidden = !on;
+  if (on) $("cv-replace-text").textContent = `今ある ${n} パーツは消えます (元に戻すで戻せます)`;
+}
 function renderPreviewViews() {
   if (!PV.ready) return;
   for (const v of PV.views) {
@@ -4366,9 +4849,10 @@ function showPreviewModel(model) {
   try {
     const sym = detectSymmetry(model.root, model.ext);
     const pct = (v) => Math.round(v * 100);
+    const side = { x: "左と右", y: "手前と奥" };
     $("cv-sym-hint").textContent = sym.axis
-      ? `このモデルは ${sym.axis.toUpperCase()} で左右対称と判定 (一致 ${pct(sym[sym.axis])}%)`
-      : `左右対称ではないと判定 (一致 X ${pct(sym.x)}% / Y ${pct(sym.y)}%)`;
+      ? `このモデルは${side[sym.axis]}が同じ形と判定しました (一致 ${pct(sym[sym.axis])}%)`
+      : `左右対称ではないと判定しました (左右 ${pct(sym.x)}% / 手前と奥 ${pct(sym.y)}%)`;
     if (!CV.group) {
       $("cv-sym").checked = !!sym.axis;
       $("cv-sym-axis").value = sym.axis || "y";
@@ -4822,11 +5306,11 @@ async function renderList() {
     if (src) a.append(Object.assign(document.createElement("img"), { src, alt: "" }));
     const b = tr.insertCell();
     const n = document.createElement("div"); n.className = "n"; n.textContent = r.part.replace(/\.dat$/i, "");
-    const s = document.createElement("div"); s.className = "s"; s.textContent = partName(r.part);
+    const s = document.createElement("div"); s.className = "s"; s.textContent = partNameJa(r.part); s.title = partName(r.part);
     const [cname, hex] = colorInfo(r.color);
     const c = document.createElement("div"); c.className = "s";
     const dot = document.createElement("span"); dot.className = "dot"; dot.style.background = "#" + hex;
-    c.append(dot, `${cname.replace(/_/g, " ")} (${colorLabel(r.color)})`);
+    c.append(dot, `${colorJa(r.color)} (${colorLabel(r.color)})`); c.title = cname.replace(/_/g, " ");
     b.append(n, s, c);
     const q = tr.insertCell(); q.className = "q"; q.textContent = r.qty;
   }
@@ -4877,6 +5361,7 @@ function selectTab(name) {
     if (S.tool !== "select") setTool("select");
   }
   try { localStorage.setItem("pocchi-kobo-tab", name); } catch { /* 覚えなくても困らない */ }
+  if (matchMedia("(max-width: 860px)").matches && window.scrollY > 0) window.scrollTo({ top: 0 });  // スマホ: 中身の頭から
   if (name === "list") renderList();
 }
 function wire() {
@@ -5071,13 +5556,29 @@ function setupMobileHeader() {
   setH();
   new ResizeObserver(setH).observe(head);
   head.addEventListener("transitionend", setH);
-  let last = window.scrollY;
+  // 看板を隠す・出すと高さが変わり、ブラウザがスクロール位置をずらす。それを「上へ戻した」と読むと
+  // 出す・隠すを繰り返して画面が揺れ、押したい所がずれる。切り替えた直後はしばらく見ない
+  // edge: 隠れている間は一番下まで行った所、出ている間は一番上まで戻った所。そこからの動きで決める
+  let edge = window.scrollY, lockUntil = 0;
+  const hidden = () => document.body.classList.contains("nav-hidden");
+  const setHidden = (on) => {
+    if (hidden() === on) return;
+    document.body.classList.toggle("nav-hidden", on);
+    lockUntil = performance.now() + 400;
+    setTimeout(() => { edge = window.scrollY; }, 420);
+  };
   window.addEventListener("scroll", () => {
     const y = window.scrollY;
-    if (!narrow.matches) { document.body.classList.remove("nav-hidden"); last = y; return; }
-    if (y > last + 6 && y > 40) document.body.classList.add("nav-hidden");        // 下へ: 隠す
-    else if (y < last - 6 || y <= 40) document.body.classList.remove("nav-hidden");  // 上へ: 出す
-    if (Math.abs(y - last) > 6) last = y;
+    if (!narrow.matches) { document.body.classList.remove("nav-hidden"); edge = y; return; }
+    if (performance.now() < lockUntil) return;
+    if (y <= 8) { setHidden(false); edge = y; return; }   // 一番上: 出す
+    if (hidden()) {
+      edge = Math.max(edge, y);
+      if (y < edge - 40) setHidden(false);                // はっきり上へ戻した: 出す
+    } else {
+      edge = Math.min(edge, y);
+      if (y > edge + 12 && y > 120) setHidden(true);      // 下へ: 隠す
+    }
   }, { passive: true });
 }
 
@@ -5086,6 +5587,7 @@ async function start() {
   // 状態の初期値を body の data-* に出す (この後は、変わるたびに各状態機械・関数が書き換える)
   for (const [k, v] of Object.entries({ gesture: GESTURE.state, tool: S.tool, pane: "", busy: "0", view: "all", playing: "0", tab: S.tab || "build" })) setUi(k, v);
   $("dlg-convert").dataset.preview = PREVIEW.state;
+  initAR();
   // 変換の画面を閉じたら、予定していた・計算中のプレビューはやめる
   // (close イベントは裏のタブで遅れることがあるので、ボタンで閉じたとき = submit でも止める)
   const stopPreview = () => { clearTimeout(PV.timer); PV.seq++; PREVIEW.go("idle"); };
@@ -5109,13 +5611,10 @@ async function start() {
   refreshAll();
   frameView();
   loop();
-  try {  // 部品の棚のサムネイル (青で描く)
-    _thumbs = await renderPartImages(PARTS.map(([p]) => ({ part: p, color: 1, qty: 1 })), 112);
-    renderShelf();
-  } catch (e) { console.warn("thumbnails", e); }
+  scheduleShelfThumbs();  // 部品の棚の絵 (今の色で描く)
   if (restored) restoreSources();
   if (restored) {
-    toast(`前回の続き (${S.parts.length} パーツ) を開きました。新しく始めるときは「つくる」の一番下の「すべてのパーツを消す」で`, "info", 9000);
+    toast(`前回の続き (${S.parts.length} パーツ) を開きました。新しく始めるときは「つくる」→「作業台」→「すべてのパーツを消す」`, "info", 9000);
   }
 }
 // 動作確認用 (開発者ツールから触れるように)
@@ -5131,6 +5630,9 @@ function appState() {
     canUndo: undoStack.length > 0, canRedo: redoStack.length > 0,
     models: [...S.groups.keys()].map((name) => ({ name, source: S.sources.has(name) ? "ready" : _restoring ? "restoring" : "missing" })),
     library: hasLdrawLibrary(),
+    mode: arActive() ? "ar" : "digital",
+    ar: { state: AR.state, corners: AR_DATA.taps.length, plate: AR_DATA.plate.join("x"),
+      estimatedFov: AR_DATA.pose ? AR_DATA.pose.estimated : null, err: AR_DATA.pose ? +AR_DATA.pose.err.toFixed(4) : null },
   };
 }
 // 処理・操作・プレビューの計算が終わるまで待つ (自動操作・テスト用)
@@ -5138,14 +5640,15 @@ function whenIdle(timeout = 20000) {
   const t0 = Date.now();
   return new Promise((resolve, reject) => {
     const tick = () => {
-      if (!_busy && GESTURE.is("idle") && !PREVIEW.is("scheduled", "computing") && !_restoring) return resolve(appState());
+      if (!_busy && GESTURE.is("idle") && !PREVIEW.is("scheduled", "computing") && !_restoring && !AR.is("starting")) return resolve(appState());
       if (Date.now() - t0 > timeout) return reject(new Error("whenIdle: 時間切れ " + JSON.stringify(appState())));
       setTimeout(tick, 40);
     };
     tick();
   });
 }
-window.__pocchi = { state: appState, whenIdle, machines: { gesture: GESTURE, preview: PREVIEW, clear: CLEAR }, cancelGesture,
+window.__pocchi = { state: appState, whenIdle, machines: { gesture: GESTURE, preview: PREVIEW, clear: CLEAR, ar: AR }, cancelGesture,
+  setMode, ar: { data: AR_DATA, solve: arSolve, applyPose: applyArPose, finishCorners: arFinishCorners, cover: arCover, toStage: arToStage, corners: arPlateCorners, camera },
   setTab: (name) => selectTab(name), openPane, closePane, showAll: () => { showAll(); refreshView(); refreshOrder(); },
   S, steps, setLayer, setPiece, layerStep, pieceStep, togglePlay, runConvert, reconvert, openFiles, openSample,
   exportZip, checkParts, undo, redo, addPart, moveSelected, rotateSelected, deleteSelected, duplicateSelected, setPlacing,
