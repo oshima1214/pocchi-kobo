@@ -295,7 +295,12 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 .tool .kbd { font-size: 10px; }
 .tool[aria-pressed="true"] { background: var(--sun); border-color: #16181B; color: #16181B; }
 /* AR モード: カメラの映像を作業台いっぱいに (はみ出す分は切る)、その上に透明な 3D を重ねる */
-.ar-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+/* 映像の位置・大きさは app.js が決める (切り抜いた所が作業台いっぱいになるよう、映像全体を広げてずらす) */
+.ar-video { position: absolute; left: 0; top: 0; width: 100%; height: 100%; max-width: none; object-fit: fill; }
+.ar-on .stage { background: #000; }
+.ar-cropbox { position: absolute; border: 3px dashed var(--sun); background: rgb(255 207 0 / .15); box-shadow: 0 0 0 9999px rgb(0 0 0 / .35); pointer-events: none; z-index: 4; }
+.ar-handle.dragging { cursor: grabbing; transform: scale(1.25); }
+.ar-rows { display: grid; gap: 6px; }
 .ar-on .views, .ar-on .empty { display: none; }
 .ar-handles { position: absolute; inset: 0; pointer-events: none; z-index: 3; }
 .ar-handle { position: absolute; width: 28px; height: 28px; margin: -14px 0 0 -14px; border-radius: 50%; border: 3px solid #16181B;
@@ -306,7 +311,8 @@ dialog.wide { width: min(1180px, calc(100% - 24px)); }
 .ar-guide .row { gap: 6px; }
 .ar-guide .btn, .ar-guide .input { min-height: 32px; font-size: 12px; }
 /* 四隅を押している間は、道具のバーは使えないので隠す (映像を広く見せる) */
-body[data-ui-ar="calibrating"] .toolbar, body[data-ui-ar="starting"] .toolbar { display: none; }
+body[data-ui-ar="calibrating"] .toolbar, body[data-ui-ar="starting"] .toolbar, body[data-ui-ar="cropping"] .toolbar { display: none; }
+body[data-ui-ar="cropping"] #view { cursor: crosshair; }
 .ar-guide b { font-family: var(--font-display); font-size: 15px; }
 .arbar { position: absolute; right: 12px; bottom: 12px; left: 12px; max-width: 760px; margin-left: auto; z-index: 6; background: var(--chip);
   border-radius: 14px; box-shadow: var(--shadow); padding: 8px 10px; display: grid; gap: 6px; font-size: 12px; font-weight: 700; }
@@ -566,16 +572,23 @@ body[data-ui-ar="calibrating"] .toolbar, body[data-ui-ar="starting"] .toolbar { 
       <video id="ar-video" class="ar-video" playsinline muted hidden></video>
       <canvas id="view"></canvas>
       <div class="ar-handles" id="ar-handles"></div>
+      <div class="ar-cropbox" id="ar-cropbox" hidden></div>
       <div class="ar-guide" id="ar-guide" hidden>
         <b id="ar-guide-text">基礎板の四隅を押してください (0 / 4)</b>
-        <p class="hint">カメラに本物の基礎板を映して、四隅のかどを 1 つずつ押します (順番は自由)。押した印はドラッグで動かせます。合わせた後は、カメラと基礎板を動かさないでください。</p>
-        <div class="row"><select class="input grow" id="ar-plate" aria-label="基礎板の大きさ"></select><button class="btn" id="ar-undo-tap" type="button">1 つ戻す</button><button class="btn" id="ar-cancel" type="button">やめる</button></div>
+        <div class="ar-rows" id="ar-cal-row">
+          <p class="hint">カメラに本物の基礎板を映して、四隅のかどを 1 つずつ押します (順番は自由)。基礎板が小さく映るときは「切り抜く」で広げると押しやすくなります。合わせた後は、カメラと基礎板を動かさないでください。</p>
+          <div class="row"><select class="input grow" id="ar-plate" aria-label="基礎板の大きさ"></select><button class="btn" id="ar-crop2" type="button">切り抜く</button><button class="btn" id="ar-uncrop2" type="button" hidden>全体に戻す</button><button class="btn" id="ar-undo-tap" type="button">1 つ戻す</button><button class="btn" id="ar-cancel" type="button">やめる</button></div>
+        </div>
+        <div class="row" id="ar-crop-row" hidden><button class="btn" id="ar-crop-cancel" type="button">切り抜かずに戻る</button></div>
       </div>
       <div class="arbar" id="arbar" hidden>
         <span id="arbar-text"></span>
         <div class="row">
           <select class="input" id="arbar-plate" aria-label="基礎板の大きさ"></select>
           <button class="btn" id="ar-rotate" type="button" title="モデルの向きを基礎板の上で回す">向きを回す</button>
+          <button class="btn" id="ar-crop" type="button" title="映像の一部を四角く囲んで、大きく見せる">切り抜く</button>
+          <button class="btn" id="ar-crop-plate" type="button" title="基礎板のまわりだけを大きく見せる">基礎板の所だけ</button>
+          <button class="btn" id="ar-uncrop" type="button" hidden>全体に戻す</button>
           <label class="check"><input type="checkbox" id="ar-marks" checked><span>目印</span></label>
           <button class="btn" id="ar-redo" type="button">合わせ直す</button>
           <button class="btn" id="ar-exit" type="button">デジタルに戻る</button>
@@ -1622,7 +1635,8 @@ function solveHomography(src, dst) {
 //   カメラの焦点距離 f (ピクセル) も四隅から推定する (真上から見ていて決まらないときは fDefault)。
 //   返す R は「床の x・y・z 軸が、カメラから見てどちらを向くか」(カメラ: 右 +x・下 +y・奥 +z) の 3x3 (行の配列)、t はカメラから見た床の原点。
 //   err: 推定の食い違い (0 に近いほど、長方形として素直に見えている。縦横を取り違えると大きくなる)
-function planarPose(img, world, { fDefault = 1000, fMin = 100, fMax = 1e5 } = {}) {
+//   fixedF: 焦点距離を決めて使う (推定しない)。合わせた後に角を少し動かすとき、全体の写り方が伸び縮みしないように
+function planarPose(img, world, { fDefault = 1000, fMin = 100, fMax = 1e5, fixedF = null } = {}) {
   if (!isConvexQuad(img)) return null;  // 同じ所を 2 回押した・順番がねじれている
   const H = solveHomography(world, img);
   if (!H) return null;
@@ -1633,8 +1647,8 @@ function planarPose(img, world, { fDefault = 1000, fMin = 100, fMax = 1e5 } = {}
   if (Math.abs(d1) > 1e-12) { const f2 = -(h11 * h12 + h21 * h22) / d1; if (f2 > 0) ests.push([Math.sqrt(f2), Math.abs(d1)]); }
   const d2 = h31 * h31 - h32 * h32;
   if (Math.abs(d2) > 1e-12) { const f2 = (h12 * h12 + h22 * h22 - h11 * h11 - h21 * h21) / d2; if (f2 > 0) ests.push([Math.sqrt(f2), Math.abs(d2)]); }
-  let f = fDefault, estimated = false;
-  if (ests.length) {
+  let f = fixedF || fDefault, estimated = false;
+  if (!fixedF && ests.length) {
     const wsum = ests.reduce((s, [, w]) => s + w, 0);
     const fe = ests.reduce((s, [v, w]) => s + v * w, 0) / wsum;
     if (fe >= fMin && fe <= fMax) { f = fe; estimated = true; }
@@ -3716,8 +3730,9 @@ function clearAll() {
 const ray = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 function setPointer(ev) {
-  const r = canvas.getBoundingClientRect();
-  pointer.set(((ev.clientX - r.left) / r.width) * 2 - 1, -((ev.clientY - r.top) / r.height) * 2 + 1);
+  const r = $("stage").getBoundingClientRect();  // 作業台の枠 (AR で絵を少し変形していても、枠は変わらない)
+  const [x, y] = arUnwarp(ev.clientX - r.left, ev.clientY - r.top);  // AR: 四隅を合わせる変形を戻してから当てる
+  pointer.set((x / r.width) * 2 - 1, -(y / r.height) * 2 + 1);
   ray.setFromCamera(pointer, camera);
 }
 function pickPart() {
@@ -4174,13 +4189,18 @@ function mergeSelected() {
 
 // ---------------------------------------------------------------- AR モード
 // Web カメラに映した本物の基礎板の四隅を押すと、その上にモデルを重ねて表示する。
-// 押した四隅 (画面の位置) と基礎板の大きさ (ポッチの数) から、カメラの位置・向き・画角を求める (core.js の planarPose)。
+// 押した四隅 (映像の中の位置) と基礎板の大きさ (ポッチの数) から、カメラの位置・向き・画角を求める (core.js の planarPose)。
 // カメラも基礎板も、合わせた後は動かさない前提 (動いたら「合わせ直す」)。
 //   状態: off → starting (カメラを起こす) → calibrating (四隅を押す) → ready (重ねて表示)。ready → calibrating (合わせ直す)
+//         calibrating / ready → cropping (映像を四角く切り抜く) → 元の状態へ
+// 押した四隅は「映像の中の位置 (0〜1)」で覚える。切り抜き・作業台の大きさが変わっても、合わせ直さなくてよい。
 const AR_PLATES = [[32, 32], [48, 48], [16, 16], [16, 32], [10, 20], [8, 16], [8, 8]];
 const AR = createMachine("ar", {
   initial: "off",
-  states: { off: ["starting"], starting: ["calibrating", "off"], calibrating: ["ready", "off"], ready: ["calibrating", "off"] },
+  states: {
+    off: ["starting"], starting: ["calibrating", "off"],
+    calibrating: ["ready", "off", "cropping"], ready: ["calibrating", "off", "cropping"], cropping: ["calibrating", "ready", "off"],
+  },
   onChange: (to) => { setUi("ar", to); syncArView(); },
 });
 const AR_DATA = {
@@ -4189,23 +4209,40 @@ const AR_DATA = {
   k: 0,             // どの角を基礎板のどの角に合わせるか (向きを回すと変わる)
   plate: [32, 32],  // 基礎板の大きさ [横, 奥行き] (ポッチ)
   marks: true,      // 合わせの目印 (縁・ポッチの位置) を出す
+  crop: [0, 0, 1, 1],  // 映像の切り抜き [左, 上, 幅, 高さ] (映像の中の 0〜1)。この範囲を作業台いっぱいに広げて見せる
+  cropFrom: null,   // 切り抜きを始める前の状態 (終わったら戻る)
+  lockF: null,      // 合わせたときに求めた焦点距離 (映像のピクセル)。角を動かしても変えない
+  fEstimated: false,
   pose: null,       // 求めたカメラ { f, R, t, estimated, err }
   camMatrix: new THREE.Matrix4(),
+  view: null,       // three.js のカメラの画角・ずれ { fov, aspect, fullW, fullH, x, y, W, H }
+  warp: null, warpInv: null,  // 四隅をぴったり合わせるための、描いた絵の小さな変形 (作業台の px → px)
 };
 try { const v = JSON.parse(localStorage.getItem("pocchi-kobo-ar") || "null"); if (v && v.plate) AR_DATA.plate = v.plate; if (v && "marks" in v) AR_DATA.marks = !!v.marks; } catch { /* はじめての人 */ }
 function saveArPrefs() { try { localStorage.setItem("pocchi-kobo-ar", JSON.stringify({ plate: AR_DATA.plate, marks: AR_DATA.marks })); } catch { /* 覚えなくても困らない */ } }
 const arActive = () => !AR.is("off");
+// 合わせたカメラで部品を描くか (切り抜いている間も、合わせ終わっていれば描く)
+const arHasPose = () => !!AR_DATA.pose && (AR.is("ready") || (AR.is("cropping") && AR_DATA.cropFrom === "ready"));
+const arCropped = () => AR_DATA.crop.join() !== "0,0,1,1";
 
-// 映像は作業台いっぱいに「はみ出して」表示 (object-fit: cover)。映像の中の位置 (0〜1) ⇔ 作業台の上の位置 (px)
+// 映像のどこを作業台に見せるか: 切り抜いた範囲が作業台いっぱいになるよう広げ、真ん中にそろえる
+//   dw・dh: 映像全体を描いたときの大きさ (px)、ox・oy: その左上 (作業台の中。マイナスなら作業台の外)
 function arCover() {
   const v = $("ar-video"), r = $("stage").getBoundingClientRect();
   const vw = v.videoWidth || 1280, vh = v.videoHeight || 720;
-  const s = Math.max(r.width / vw, r.height / vh);
+  const [cx, cy, cw, ch] = AR_DATA.crop;
+  // 切り抜いていないとき: 作業台を映像で埋める (はみ出す分は切る)。切り抜いたとき: 囲んだ所が全部見えるように (余白にはまわりの映像が見える)
+  const fit = cw === 1 && ch === 1 ? Math.max : Math.min;
+  const s = fit(r.width / (vw * cw), r.height / (vh * ch));
   const dw = vw * s, dh = vh * s;
-  return { W: r.width, H: r.height, dw, dh, ox: (r.width - dw) / 2, oy: (r.height - dh) / 2, rect: r };
+  return { W: r.width, H: r.height, dw, dh, s, ox: r.width / 2 - (cx + cw / 2) * dw, oy: r.height / 2 - (cy + ch / 2) * dh, rect: r };
 }
 const arToStage = ([x, y], c = arCover()) => [c.ox + x * c.dw, c.oy + y * c.dh];
 const arFromStage = ([u, v], c = arCover()) => [(u - c.ox) / c.dw, (v - c.oy) / c.dh];
+function layoutArVideo(c = arCover()) {
+  const v = $("ar-video");
+  Object.assign(v.style, { left: c.ox + "px", top: c.oy + "px", width: c.dw + "px", height: c.dh + "px" });
+}
 
 // 基礎板の四隅 (3D の床の上、ポッチの中心が整数の位置。画面の基礎板と同じ並び)。上から見て左奥から右回り
 function arPlateCorners([w, d]) {
@@ -4218,10 +4255,14 @@ function arPlateCorners([w, d]) {
 function arSolve() {
   if (AR_DATA.taps.length < 4) return false;
   const c = arCover();
-  const img = AR_DATA.taps.map((p) => { const [u, v] = arToStage(p, c); return [u - c.W / 2, v - c.H / 2]; });
+  // カメラのレンズの真ん中 = 映像の真ん中 (切り抜くと、作業台の真ん中からずれる)
+  const pcx = c.ox + c.dw / 2, pcy = c.oy + c.dh / 2;
+  const stagePts = AR_DATA.taps.map((p) => arToStage(p, c));
+  const img = stagePts.map(([u, v]) => [u - pcx, v - pcy]);
   const world = arPlateCorners(AR_DATA.plate);
   const half = c.dw / 2, deg = Math.PI / 180;
-  const opts = { fDefault: half / Math.tan(31 * deg), fMin: half / Math.tan(55 * deg), fMax: half / Math.tan(10 * deg) };
+  const opts = { fDefault: half / Math.tan(31 * deg), fMin: half / Math.tan(55 * deg), fMax: half / Math.tan(10 * deg),
+    fixedF: AR_DATA.lockF ? AR_DATA.lockF * c.s : null };
   const square = AR_DATA.plate[0] === AR_DATA.plate[1];
   const solveK = (k) => planarPose(img, img.map((_, i) => world[(i + k) % 4]), opts);
   let pose = solveK(AR_DATA.k);
@@ -4233,6 +4274,7 @@ function arSolve() {
   }
   if (!pose) { AR_DATA.pose = null; return false; }
   AR_DATA.pose = pose;
+  if (!AR_DATA.lockF) { AR_DATA.lockF = pose.f / c.s; AR_DATA.fEstimated = pose.estimated; }
   const { R, t, f } = pose;
   // 床 → カメラ (カメラは 右 +x・下 +y・奥 +z)。three.js のカメラは 右 +x・上 +y・手前 +z なので y・z を裏返す
   AR_DATA.camMatrix.set(
@@ -4240,19 +4282,48 @@ function arSolve() {
     -R[1][0], -R[1][1], -R[1][2], -t[1],
     -R[2][0], -R[2][1], -R[2][2], -t[2],
     0, 0, 0, 1).invert();
-  AR_DATA.fov = 2 * Math.atan((c.H / 2) / f) / deg;
-  AR_DATA.aspect = c.W / c.H;  // 求めたときの作業台の形 (画角はこの形で決まる)
+  // 画角は映像全体で決め、作業台に見えている所だけを切り出して描く (setViewOffset)
+  AR_DATA.view = { fov: 2 * Math.atan((c.dh / 2) / f) / deg, aspect: c.dw / c.dh, fullW: c.dw, fullH: c.dh, x: -c.ox, y: -c.oy, W: c.W, H: c.H };
   rebuildArMarks();
   applyArPose();  // 次の描画を待たずに使う (すぐ後のクリックも、合わせたカメラで当たり判定する)
+  // 押した四隅は、映像の上の正確な位置。求めたカメラで写した四隅とのわずかな差を、絵の変形でなくす
+  // (どの角を動かしても、ほかの 3 つの角は押した所から動かない)
+  const proj = AR_DATA.taps.map((_, i) => {
+    const [X, Z] = world[(i + AR_DATA.k) % 4];
+    const p = new THREE.Vector3(X, 0, Z).project(camera);
+    return [(p.x + 1) / 2 * c.W, (1 - p.y) / 2 * c.H];
+  });
+  AR_DATA.warp = solveHomography(proj, stagePts);
+  AR_DATA.warpInv = solveHomography(stagePts, proj);
+  applyArWarp();
   return true;
 }
+function applyArWarp() {
+  const h = arHasPose() && AR_DATA.warp;
+  if (!h) { canvas.style.transform = ""; return; }
+  // CSS の matrix3d は列ごとに並べる。(x, y) → (h11 x + h12 y + h13, ...) / (h31 x + h32 y + h33)
+  canvas.style.transformOrigin = "0 0";
+  canvas.style.transform = `matrix3d(${[h[0][0], h[1][0], 0, h[2][0], h[0][1], h[1][1], 0, h[2][1], 0, 0, 1, 0, h[0][2], h[1][2], 0, h[2][2]].join(",")})`;
+}
+// クリックした所 (作業台の px) を、変形する前の絵の上の位置に戻す (当たり判定用)
+function arUnwarp(x, y) {
+  const h = arHasPose() && AR_DATA.warpInv;
+  if (!h) return [x, y];
+  const w = h[2][0] * x + h[2][1] * y + h[2][2];
+  return [(h[0][0] * x + h[0][1] * y + h[0][2]) / w, (h[1][0] * x + h[1][1] * y + h[1][2]) / w];
+}
 // 毎フレーム: 求めたカメラをそのまま使う (視点の操作では動かない)
+let _arViewKey = "";
 function applyArPose() {
-  if (!AR.is("ready") || !AR_DATA.pose) return;
+  if (!arHasPose()) return;
   AR_DATA.camMatrix.decompose(camera.position, camera.quaternion, camera.scale);
   camera.updateMatrixWorld(true);
-  if (Math.abs(camera.fov - AR_DATA.fov) > 1e-6 || Math.abs(camera.aspect - AR_DATA.aspect) > 1e-6 || camera.near !== 0.5) {
-    camera.fov = AR_DATA.fov; camera.aspect = AR_DATA.aspect; camera.near = 0.5; camera.far = 5000; camera.updateProjectionMatrix();
+  const v = AR_DATA.view, key = Object.values(v).join();
+  if (key !== _arViewKey || camera.near !== 0.5) {
+    _arViewKey = key;
+    camera.fov = v.fov; camera.aspect = v.aspect; camera.near = 0.5; camera.far = 5000;
+    camera.setViewOffset(v.fullW, v.fullH, v.x, v.y, v.W, v.H);  // setViewOffset が画面の形 (aspect) も合わせる
+    camera.updateProjectionMatrix();
   }
 }
 
@@ -4283,23 +4354,29 @@ function rebuildArMarks() {
 
 // 画面の見た目を AR の状態に合わせる
 function syncArView() {
-  const on = arActive(), ready = AR.is("ready"), cal = AR.is("calibrating");
+  const on = arActive(), ready = AR.is("ready"), cal = AR.is("calibrating"), crop = AR.is("cropping"), posed = arHasPose();
   setUi("mode", on ? "ar" : "digital");
   document.body.classList.toggle("ar-on", on);
   for (const b of $$("button[data-mode]")) b.setAttribute("aria-pressed", String(b.dataset.mode === (on ? "ar" : "digital")));
   $("ar-video").hidden = !on;
-  $("ar-guide").hidden = !(cal || AR.is("starting"));
+  $("ar-guide").hidden = !(cal || crop || AR.is("starting"));
   $("arbar").hidden = !ready;
+  $("ar-cal-row").hidden = !cal;
+  $("ar-crop-row").hidden = !crop;
   baseGroup.visible = !on;
   grid.visible = !on && !S.baseplate;
-  arMarks.visible = ready && AR_DATA.marks;
+  arMarks.visible = posed && AR_DATA.marks;
   // 部品は合わせ終わってから出す (四隅を押している間は、カメラの映像だけ)
-  for (const m of [partsGroup, outlineGroup, overlayGroup, edgeGroup]) m.visible = !on || ready;
+  for (const m of [partsGroup, outlineGroup, overlayGroup, edgeGroup]) m.visible = !on || posed;
   controls.enableRotate = controls.enableZoom = controls.enablePan = !on;
   if (on) { scene.background = null; renderer.setClearColor(0x000000, 0); } else themeColors();
   if (AR.is("starting")) $("ar-guide-text").textContent = "カメラを起こしています…";
   if (cal) refreshArGuide();
+  if (crop) $("ar-guide-text").textContent = "映像の上で、見たい所を四角く囲んでください";
   if (ready) refreshArBar();
+  for (const id of ["ar-uncrop", "ar-uncrop2"]) $(id).hidden = !arCropped();
+  if (on) layoutArVideo();
+  applyArWarp();
   renderArHandles();
   needRender = true;
 }
@@ -4311,11 +4388,11 @@ function refreshArGuide() {
 function refreshArBar() {
   const [w, d] = AR_DATA.plate, p = AR_DATA.pose;
   let msg = `基礎板 ${w}×${d} に重ねています。黄色い丸が本物のポッチと重なっていれば OK`;
-  if (p && p.err > 0.15) msg += "。四隅が少しずれているかもしれません (丸の印を動かして直せます)";
-  else if (p && !p.estimated) msg += "。真上に近いので、カメラの画角はおおよそです";
+  if (p && p.err > 0.15) msg += "。四隅が少しずれているかもしれません (角の印を動かして直せます)";
+  else if (!AR_DATA.fEstimated) msg += "。真上に近いので、カメラの画角はおおよそです";
   $("arbar-text").textContent = msg;
 }
-// 押した所の印 (番号つき)。合わせた後もドラッグで少しずつ直せる
+// 押した所の印 (番号つき)。合わせた後もドラッグで少しずつ直せる (動かした角だけが動く)
 function renderArHandles() {
   const box = $("ar-handles");
   box.textContent = "";
@@ -4331,13 +4408,22 @@ function renderArHandles() {
     h.addEventListener("pointerdown", (ev) => {
       ev.preventDefault(); ev.stopPropagation();
       try { h.setPointerCapture(ev.pointerId); } catch { /* つかめなくても、印の上で動かせば追いかける */ }
+      // つかんだ所と角の中心のずれを保つ (押した瞬間に角が指の位置へ跳ばない)
+      const r0 = $("stage").getBoundingClientRect();
+      const [hu, hv] = arToStage(AR_DATA.taps[i]);
+      const offX = hu - (ev.clientX - r0.left), offY = hv - (ev.clientY - r0.top);
+      h.classList.add("dragging");
       const move = (e) => {
         const r = $("stage").getBoundingClientRect();
-        AR_DATA.taps[i] = arFromStage([e.clientX - r.left, e.clientY - r.top]);
-        h.style.left = (e.clientX - r.left) + "px"; h.style.top = (e.clientY - r.top) + "px";
+        const u2 = e.clientX - r.left + offX, v2 = e.clientY - r.top + offY;
+        AR_DATA.taps[i] = arFromStage([u2, v2]);
+        h.style.left = u2 + "px"; h.style.top = v2 + "px";
         if (AR.is("ready")) { arSolve(); refreshArBar(); needRender = true; }
       };
-      const up = () => { h.removeEventListener("pointermove", move); h.removeEventListener("pointerup", up); h.removeEventListener("pointercancel", up); };
+      const up = () => {
+        h.classList.remove("dragging");
+        h.removeEventListener("pointermove", move); h.removeEventListener("pointerup", up); h.removeEventListener("pointercancel", up);
+      };
       h.addEventListener("pointermove", move); h.addEventListener("pointerup", up); h.addEventListener("pointercancel", up);
     });
     box.append(h);
@@ -4345,14 +4431,74 @@ function renderArHandles() {
 }
 function arRelayout() {
   if (!arActive()) return;
-  if (AR.is("ready")) arSolve();  // 作業台の大きさが変わると、映像の写り方も変わる
+  layoutArVideo();
+  if (arHasPose()) arSolve();  // 作業台の大きさ・切り抜きが変わると、映像の写り方も変わる
   renderArHandles();
   needRender = true;
 }
 
-// 四隅を押す (押している間は、ほかの操作に渡さない)
+// 映像を切り抜く (ドラッグで四角く囲む)
+function setArCrop(crop) {
+  const [x, y, w, h] = crop;
+  const cw = Math.min(1, Math.max(0.08, w)), ch = Math.min(1, Math.max(0.08, h));
+  AR_DATA.crop = [Math.min(1 - cw, Math.max(0, x)), Math.min(1 - ch, Math.max(0, y)), cw, ch];
+  arRelayout();
+  syncArView();
+}
+function arCropToPlate() {  // 押した四隅が入るように (まわりを少し残して) 切り抜く
+  if (AR_DATA.taps.length < 4) return;
+  const xs = AR_DATA.taps.map((p) => p[0]), ys = AR_DATA.taps.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const mx = (x1 - x0) * 0.12, my = (y1 - y0) * 0.12;
+  setArCrop([x0 - mx, y0 - my, x1 - x0 + 2 * mx, y1 - y0 + 2 * my]);
+}
+function startArCrop() {
+  if (!AR.is("calibrating", "ready")) return;
+  AR_DATA.cropFrom = AR.state;
+  AR.go("cropping");
+}
+function endArCrop() {
+  if (!AR.is("cropping")) return;
+  $("ar-cropbox").hidden = true;
+  AR.go(AR_DATA.cropFrom === "ready" && AR_DATA.pose ? "ready" : "calibrating");
+  AR_DATA.cropFrom = null;
+}
+let _arCropDrag = null;
+function arCropPointer(ev) {
+  const r = $("stage").getBoundingClientRect();
+  const x = ev.clientX - r.left, y = ev.clientY - r.top;
+  const box = $("ar-cropbox");
+  if (ev.type === "pointerdown") {
+    _arCropDrag = { x, y };
+    Object.assign(box.style, { left: x + "px", top: y + "px", width: "0px", height: "0px" });
+    box.hidden = false;
+    return;
+  }
+  if (!_arCropDrag) return;
+  const a = _arCropDrag;
+  Object.assign(box.style, { left: Math.min(a.x, x) + "px", top: Math.min(a.y, y) + "px", width: Math.abs(x - a.x) + "px", height: Math.abs(y - a.y) + "px" });
+  if (ev.type !== "pointerup") return;
+  _arCropDrag = null;
+  box.hidden = true;
+  if (Math.abs(x - a.x) < 12 || Math.abs(y - a.y) < 12) return;  // 小さすぎる = 押しただけ。もう一度囲んでもらう
+  const c = arCover();
+  const p0 = arFromStage([Math.min(a.x, x), Math.min(a.y, y)], c), p1 = arFromStage([Math.max(a.x, x), Math.max(a.y, y)], c);
+  const from = AR_DATA.cropFrom;
+  setArCrop([p0[0], p0[1], p1[0] - p0[0], p1[1] - p0[1]]);
+  AR_DATA.cropFrom = from;
+  endArCrop();
+}
+
+// 四隅を押す・切り抜く (その間は、ほかの操作に渡さない)
 function arTap(ev) {
-  if (!AR.is("calibrating") || ev.target !== canvas || ev.button !== 0) return;
+  if (ev.target !== canvas || ev.button !== 0) return;
+  if (AR.is("cropping")) {
+    ev.preventDefault(); ev.stopPropagation();
+    try { canvas.setPointerCapture(ev.pointerId); } catch { /* なくても動く */ }
+    arCropPointer(ev);
+    return;
+  }
+  if (!AR.is("calibrating")) return;
   ev.preventDefault(); ev.stopPropagation();
   const r = $("stage").getBoundingClientRect();
   if (AR_DATA.taps.length >= 4) AR_DATA.taps = [];
@@ -4362,11 +4508,11 @@ function arTap(ev) {
 }
 function arFinishCorners() {
   AR_DATA.taps = orderQuad(AR_DATA.taps);
-  AR_DATA.k = 0; AR_DATA.kChosen = false;
-  if (arSolve()) {
-    AR.go("ready");
-    applyArPose();
-  } else { refreshArGuide(); renderArHandles(); }
+  AR_DATA.k = 0; AR_DATA.kChosen = false; AR_DATA.lockF = null;
+  AR_DATA.cropFrom = null;
+  AR.go("ready");  // 先に ready にしてから解く (解いたカメラをすぐ使うため)
+  if (!arSolve()) { AR.go("calibrating"); refreshArGuide(); renderArHandles(); return; }
+  syncArView();
 }
 
 async function startAR() {
@@ -4388,7 +4534,7 @@ async function startAR() {
     v.srcObject = stream;
     await v.play().catch(() => {});
     if (!v.videoWidth) await new Promise((r) => { v.onloadedmetadata = r; setTimeout(r, 1500); });
-    AR_DATA.taps = []; AR_DATA.pose = null;
+    AR_DATA.taps = []; AR_DATA.pose = null; AR_DATA.lockF = null; AR_DATA.crop = [0, 0, 1, 1];
     AR.go("calibrating");
   } catch (e) {
     AR.go("off");
@@ -4405,7 +4551,10 @@ function stopAR() {
   if (AR_DATA.stream) AR_DATA.stream.getTracks().forEach((t) => t.stop());
   AR_DATA.stream = null;
   $("ar-video").srcObject = null;
+  $("ar-cropbox").hidden = true;
   AR.go("off");
+  camera.clearViewOffset();
+  _arViewKey = "";
   camera.fov = 38;
   resize();
   frameView();
@@ -4419,6 +4568,8 @@ function initAR() {
     if (b) { b.disabled = true; b.title = "このブラウザではカメラが使えません"; }
   }
   $("stage").addEventListener("pointerdown", arTap, { capture: true });
+  canvas.addEventListener("pointermove", (ev) => { if (AR.is("cropping") && _arCropDrag) { ev.stopImmediatePropagation(); arCropPointer(ev); } }, { capture: true });
+  canvas.addEventListener("pointerup", (ev) => { if (AR.is("cropping") && _arCropDrag) { ev.stopImmediatePropagation(); arCropPointer(ev); } }, { capture: true });
   for (const sel of [$("ar-plate"), $("arbar-plate")]) {
     sel.textContent = "";
     for (const [w, d] of AR_PLATES) sel.append(new Option(`${w}×${d} ポッチ`, `${w}x${d}`));
@@ -4426,18 +4577,22 @@ function initAR() {
     sel.onchange = () => {
       AR_DATA.plate = sel.value.split("x").map(Number);
       $("ar-plate").value = $("arbar-plate").value = sel.value;
-      AR_DATA.kChosen = false; saveArPrefs();
+      AR_DATA.kChosen = false; AR_DATA.lockF = null; saveArPrefs();  // 大きさが変わったら、画角も求め直す
       if (AR.is("ready")) { arSolve(); refreshArBar(); }
     };
   }
   $("ar-undo-tap").onclick = () => { AR_DATA.taps.pop(); refreshArGuide(); renderArHandles(); };
   $("ar-cancel").onclick = () => stopAR();
-  $("ar-redo").onclick = () => { AR_DATA.taps = []; AR_DATA.pose = null; AR.go("calibrating"); };
+  $("ar-redo").onclick = () => { AR_DATA.taps = []; AR_DATA.pose = null; AR_DATA.lockF = null; AR.go("calibrating"); };
   $("ar-rotate").onclick = () => {
     const square = AR_DATA.plate[0] === AR_DATA.plate[1];
     AR_DATA.k = (AR_DATA.k + (square ? 1 : 2)) % 4; AR_DATA.kChosen = true;
     arSolve(); refreshArBar();
   };
+  for (const id of ["ar-crop", "ar-crop2"]) $(id).onclick = () => startArCrop();
+  for (const id of ["ar-uncrop", "ar-uncrop2"]) $(id).onclick = () => setArCrop([0, 0, 1, 1]);
+  $("ar-crop-plate").onclick = () => arCropToPlate();
+  $("ar-crop-cancel").onclick = () => endArCrop();
   $("ar-marks").checked = AR_DATA.marks;
   $("ar-marks").onchange = (e) => { AR_DATA.marks = e.target.checked; saveArPrefs(); syncArView(); };
   $("ar-exit").onclick = () => stopAR();
@@ -5648,7 +5803,7 @@ function whenIdle(timeout = 20000) {
   });
 }
 window.__pocchi = { state: appState, whenIdle, machines: { gesture: GESTURE, preview: PREVIEW, clear: CLEAR, ar: AR }, cancelGesture,
-  setMode, ar: { data: AR_DATA, solve: arSolve, applyPose: applyArPose, finishCorners: arFinishCorners, cover: arCover, toStage: arToStage, corners: arPlateCorners, camera },
+  setMode, ar: { data: AR_DATA, solve: arSolve, applyPose: applyArPose, setCrop: setArCrop, cropToPlate: arCropToPlate, unwarp: arUnwarp, finishCorners: arFinishCorners, cover: arCover, toStage: arToStage, corners: arPlateCorners, camera },
   setTab: (name) => selectTab(name), openPane, closePane, showAll: () => { showAll(); refreshView(); refreshOrder(); },
   S, steps, setLayer, setPiece, layerStep, pieceStep, togglePlay, runConvert, reconvert, openFiles, openSample,
   exportZip, checkParts, undo, redo, addPart, moveSelected, rotateSelected, deleteSelected, duplicateSelected, setPlacing,
