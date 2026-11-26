@@ -242,10 +242,15 @@ input[type="range"] { accent-color: var(--brick); min-width: 0; }
 .views { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 /* 5. 組み立てる: 作業台を広く、下に大きな段送り */
 @media (min-width: 861px) { body[data-ui-step="build"] .main { grid-template-columns: 260px minmax(0, 1fr); } }
-.buildbar { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 6; display: flex; align-items: center; gap: 10px;
+.buildbar { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 6; display: grid; gap: 6px;
   max-width: 720px; margin-inline: auto; padding: 8px; border-radius: 16px; background: var(--chip); box-shadow: var(--shadow); }
 .buildbar[hidden] { display: none; }
 .buildbar .bb { min-height: 58px; font-size: 18px; font-family: var(--font-display); padding: 0 18px; }
+.bb-row { display: flex; align-items: center; gap: 10px; }
+.bb-mode { justify-self: center; }
+.bb-note { text-align: center; font-size: 13px; font-weight: 700; min-height: 1em; }
+.bb-note:empty { display: none; }
+.bb-note .warn { color: var(--brick); }
 .buildbar #bb-next { flex: 1.4; }
 .buildbar #bb-prev { flex: 1; }
 .bb-count { flex: 1; text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 24px; line-height: 1.1; white-space: nowrap; }
@@ -255,6 +260,19 @@ body[data-ui-step="build"] .hud { display: none; }  /* 何段目かは下の段�
 .ar-on .buildbar { bottom: calc(var(--arbar-h, 60px) + 20px); }
 body[data-ui-ar="calibrating"] .buildbar, body[data-ui-ar="cropping"] .buildbar, body[data-ui-ar="starting"] .buildbar { display: none; }  /* 四隅を押す間は映像を広く */
 #layer-bom .plist img { width: 40px; height: 40px; }
+#layer-bom .plist tr.now td { background: color-mix(in srgb, var(--sun) 35%, transparent); }
+.sample-card { position: absolute; left: 12px; top: 12px; z-index: 5; background: var(--chip); border-radius: 12px; box-shadow: var(--shadow);
+  padding: 6px; display: grid; gap: 2px; width: 180px; }
+.sample-card[hidden] { display: none; }
+.sample-card span { font-size: 11px; font-weight: 700; color: var(--muted); }
+.sample-card img { width: 100%; aspect-ratio: 1; object-fit: contain; }
+.complete { position: absolute; inset: 0; z-index: 9; display: grid; place-items: center; background: rgb(0 0 0 / .35); padding: 16px; }
+.complete[hidden] { display: none; }
+.complete-card { background: var(--paper); border-radius: 18px; box-shadow: var(--shadow); padding: 20px 24px; display: grid; gap: 12px;
+  justify-items: center; max-width: min(420px, 100%); }
+.complete-card b { font-family: var(--font-display); font-size: 40px; color: var(--brick); line-height: 1; }
+.complete-card img { width: min(260px, 60vw); aspect-ratio: 1; object-fit: contain; }
+.complete-card .row { justify-content: center; }
 #layer-bom .empty-note { color: var(--muted); font-size: 13px; margin: 0; }
 .views .btn { background: var(--chip); box-shadow: var(--shadow); border-color: transparent; min-height: 34px; font-size: 12px; }
 .placebar { position: absolute; left: 12px; bottom: 12px; display: flex; gap: 6px; align-items: center; background: var(--chip); padding: 6px 6px 6px 12px; border-radius: 999px; box-shadow: var(--shadow); font-size: 12px; font-weight: 700; }
@@ -426,7 +444,6 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
   .stepbar button.optional .sn { background: transparent; color: var(--ink); border: 1.5px dashed var(--ink); }
   .stepbar button[aria-current="step"] { background: var(--paper); color: var(--ink); border-top-color: var(--brick); }
   .stepbar button[aria-current="step"] .sn { background: var(--brick); color: #fff; border: 0; }
-  @media (max-width: 400px) { .stepbar button:not([aria-current="step"]) .ss { display: none; } }
   .stepnav { position: sticky; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); z-index: 3; }
   .topnav .tbtn.icon { width: 36px; padding: 0; }
   #btn-undo, #btn-redo { display: none; }  /* スマホでは「動かす」欄の戻す・やり直すを使う */
@@ -449,6 +466,7 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
   .buildbar { left: 8px; right: 8px; bottom: 8px; gap: 6px; padding: 6px; }
   .buildbar .bb { font-size: 15px; padding: 0 10px; white-space: nowrap; }
   .bb-count { font-size: 20px; }
+  .sample-card { width: 110px; left: 8px; top: 8px; }
   .ar-guide .hint { display: none; }  /* 狭い画面では説明を省いて、映像を広く */
   .arbar { left: 8px; right: 8px; bottom: 8px; }
   /* AR 中は映像を広く: 作業台を高くし、AR の操作は 1 行 (横にずらして見る) にして段送りと重ならないように */
@@ -476,8 +494,7 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
     </div>
     <nav class="stepbar-wrap" aria-label="作業の段階"><ol class="stepbar" id="stepbar"></ol></nav>
     <nav class="topnav" aria-label="操作">
-      <button class="tbtn icon" id="btn-undo" type="button" title="元に戻す (Ctrl+Z)" aria-label="元に戻す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
-      <button class="tbtn icon" id="btn-redo" type="button" title="やり直す (Ctrl+Y)" aria-label="やり直す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 000 12h3"/></svg></button>
+      <button class="tbtn solid" id="btn-save" type="button" title="ファイルに書き出す"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg><span>保存</span></button>
       <button class="tbtn icon" id="btn-help" type="button" title="使い方" aria-label="使い方"><span style="font-weight:800">?</span></button>
     </nav>
   </header>
@@ -492,28 +509,10 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
             <p class="hint">ブロックにしたい 3D モデルのファイルを選びます。.glb / .gltf / .obj / .fbx / .stl / .ply が読めます。.obj の色や .gltf の外部ファイルは、関係するファイル (.mtl・画像・.bin) も一緒に選んでください。作業台にファイルを落としても読み込めます。</p>
             <button class="btn primary block big" id="btn-open" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>3D モデルをひらく</button>
           </div>
-          <div class="sec">
-            <h3>サンプルで試す</h3>
-            <div class="row wrap" id="sample-row"></div>
-          </div>
-          <div class="sec sep">
-            <h3>自由に作る</h3>
-            <p class="hint">3D モデルを使わずに、部品を選んで基礎板の上に置いていきます。</p>
-            <button class="btn block" id="btn-freebuild" type="button">部品を置いて自由に作る →</button>
-          </div>
-        </section>
-
-        <!-- 2. 変換 -->
-        <section class="panel" id="step-convert" data-step-panel hidden>
-          <div class="sec" id="convert-none">
-            <h3>変換</h3>
-            <p class="hint">3D モデルをひらくと、ここで変換の設定ができます。</p>
-            <button class="btn primary block" id="btn-goto-open" type="button">「ひらく」へ</button>
-          </div>
           <div class="sec" id="reconv" hidden>
-            <h3>変換したモデルを作り直す</h3>
+            <h3>変換しなおす <small class="hint">ファイルをひらき直さずに、設定を変えて作り直せます</small></h3>
             <div class="readout" id="reconv-now"></div>
-            <button class="btn primary block" id="btn-reconvert-full" type="button">大きさ・変換のしかた・使うパーツを変えて作り直す</button>
+            <button class="btn primary block" id="btn-reconvert-full" type="button">設定を変えて変換しなおす</button>
             <p class="hint">変換の画面がプレビュー付きで開きます。今の設定から始まります。</p>
             <details class="quick">
               <summary>細かさだけすぐ変える</summary>
@@ -523,10 +522,19 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
             </details>
             <label class="check"><input type="checkbox" id="opt-source"><span>元のモデルを重ねて表示</span></label>
           </div>
-          <p class="skip"><button class="btn link" id="btn-skip-edit" type="button">編集せずに部品をそろえる →</button></p>
+          <div class="sec">
+            <h3>サンプルで試す</h3>
+            <div class="row wrap" id="sample-row"></div>
+          </div>
+          <div class="sec sep">
+            <h3>自由に作る</h3>
+            <p class="hint">3D モデルを使わずに、部品を選んで基礎板の上に置いていきます。</p>
+            <button class="btn block" id="btn-freebuild" type="button">部品を置いて自由に作る →</button>
+          </div>
+          <p class="skip" id="skip-edit-row" hidden><button class="btn link" id="btn-skip-edit" type="button">編集せずに部品をそろえる →</button></p>
         </section>
 
-        <!-- 3. 編集 -->
+        <!-- 2. 編集 -->
         <section class="panel" id="step-edit" data-step-panel hidden>
           <div class="sec">
             <h3>ほかの道具 <small class="hint">押すと作業台の上に出ます</small></h3>
@@ -576,7 +584,7 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
           </div>
         </section>
 
-        <!-- 4. 部品をそろえる -->
+        <!-- 3. 部品をそろえる -->
         <section class="panel" id="step-parts" data-step-panel hidden>
           <div class="sec">
             <h3>大きさ</h3>
@@ -593,36 +601,13 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
           <div class="sec" style="overflow-x:auto"><table class="plist" id="plist"></table></div>
         </section>
 
-        <!-- 5. 組み立てる -->
+        <!-- 4. 組み立てる -->
         <section class="panel" id="step-build" data-step-panel hidden>
+          <label class="check"><input type="checkbox" id="opt-sample"><span>完成見本を表示 <small class="hint">作業台の左上に、できあがりの絵を出す</small></span></label>
           <div class="sec">
             <h3 id="layer-bom-title">この段の部品</h3>
             <div id="layer-bom"></div>
           </div>
-          <details class="quick" id="build-more">
-            <summary>細かく見る</summary>
-            <div class="sec">
-              <div class="stepper">
-                <span class="lbl">1 段ずつ</span>
-                <button class="btn" id="layer-down" type="button" aria-label="1 段戻す">▼</button>
-                <input class="input" id="layer-num" type="number" min="0" value="0" aria-label="段">
-                <button class="btn" id="layer-up" type="button" aria-label="1 段進める">▲</button>
-                <span class="lbl">1 パーツずつ</span>
-                <button class="btn" id="piece-down" type="button" aria-label="1 個戻す">◀</button>
-                <input class="input" id="piece-num" type="number" min="0" value="0" aria-label="個">
-                <button class="btn" id="piece-up" type="button" aria-label="1 個置く">▶</button>
-              </div>
-              <div class="row">
-                <button class="btn primary grow" id="btn-play" type="button">▶ 自動で組み立てる</button>
-                <input class="input num" id="play-speed" type="number" min="0.02" max="2" step="0.05" value="0.15" aria-label="秒/個"><span class="hint">秒/個</span>
-              </div>
-              <div class="progress" aria-hidden="true"><i id="build-bar"></i></div>
-              <div class="readout" id="order-readout"></div>
-              <button class="btn block" id="btn-showall" type="button">全部表示に戻す</button>
-              <button class="btn block" id="btn-export-shown" type="button">表示中のところまでを書き出す (.ldr)</button>
-              <p class="hint">キー: <span class="kbd">[</span> <span class="kbd">]</span> 段、<span class="kbd">,</span> <span class="kbd">.</span> 1 個、<span class="kbd">Space</span> 自動再生</p>
-            </div>
-          </details>
           <div class="sec sep">
             <h3>実物の基礎板に重ねる (AR)</h3>
             <p class="hint">Web カメラに映した本物の基礎板の上に、モデルを重ねて見ます。</p>
@@ -630,19 +615,6 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
           </div>
         </section>
 
-        <!-- 6. 保存 -->
-        <section class="panel" id="step-save" data-step-panel hidden>
-          <div class="sec">
-            <h3>ファイルに書き出す</h3>
-            <p class="hint">設計図 (LDraw .ldr、部品表つき) や、色付きの 3D モデル (.glb / .obj)、3D プリンタ向け (.stl) で保存できます。</p>
-            <button class="btn primary block big" id="btn-export" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>ファイルに書き出す…</button>
-          </div>
-          <div class="sec">
-            <h3>1 段ずつ書き出す</h3>
-            <button class="btn block" id="btn-export-layers" type="button">1 段ずつ全部書き出す</button>
-            <p class="hint">1 段目だけ・2 段目だけ・…、とその段のパーツだけの .ldr を段の数だけ作り、1 つの zip にまとめます。</p>
-          </div>
-        </section>
       </div>
       <div class="stepnav" id="stepnav">
         <button class="btn" id="step-prev" type="button">← 戻る</button>
@@ -742,10 +714,29 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
         <button class="btn" data-view="top" type="button">上から</button>
         <button class="btn" data-view="front" type="button">正面</button>
       </div>
+      <div class="sample-card" id="sample-card" hidden><span>完成見本</span><img id="sample-img" alt="完成したモデルの見本"></div>
       <div class="buildbar" id="buildbar" hidden>
-        <button class="btn bb" id="bb-prev" type="button">◀ 前の段</button>
-        <div class="bb-count" id="bb-count" aria-live="polite"></div>
-        <button class="btn primary bb" id="bb-next" type="button">次の段 ▶</button>
+        <div class="seg bb-mode" role="group" aria-label="進め方">
+          <button type="button" data-bmode="layer" aria-pressed="true">1 段ずつ</button>
+          <button type="button" data-bmode="piece" aria-pressed="false">1 個ずつ</button>
+        </div>
+        <div class="bb-row">
+          <button class="btn bb" id="bb-prev" type="button">◀ 前へ</button>
+          <div class="bb-count" id="bb-count" aria-live="polite"></div>
+          <button class="btn primary bb" id="bb-next" type="button">次へ ▶</button>
+        </div>
+        <div class="bb-note" id="bb-note"></div>
+      </div>
+      <div class="complete" id="complete" hidden>
+        <div class="complete-card">
+          <b>完成！</b>
+          <img id="complete-img" alt="完成したモデル">
+          <div class="row">
+            <button class="btn" id="complete-again" type="button">最初から見る</button>
+            <button class="btn primary" id="complete-save" type="button">保存する</button>
+            <button class="btn" id="complete-close" type="button">閉じる</button>
+          </div>
+        </div>
       </div>
       <div class="drop" id="drop" hidden>ここにファイルを落とすと読み込みます</div>
       <div class="empty" id="empty" hidden>
@@ -806,30 +797,20 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
         </select>
         <div class="row"><label class="lbl" for="cv-smooth">なめらかにする</label>
           <select class="input grow" id="cv-smooth"><option value="0">しない</option><option value="1">弱 (とげ・細い棒を削り、小さなくぼみを埋める)</option><option value="2">強 (1 マス厚の縁も削る)</option></select></div>
-        <label class="check"><input type="checkbox" id="cv-thin"><span>細い部分を太らせない <small class="hint">マスの真ん中がモデルの中にあるマスだけ埋める。細い所が消えることがある</small></span></label>
-        <p class="note">マス目は自動でモデルの真ん中にそろえます。本体から浮いたパーツは自動でつなぎ直し、つなげないものは作りません。</p>
         <p class="note" id="cv-both" hidden>両方オン: 表面を下から積めるよう、支えに要る中身は残します (中はほぼ空きません)</p>
       </div>
       <div class="box">
         <h4>使うパーツ</h4>
         <div class="row"><span class="lbl">まとめて選ぶ</span><div class="seg" id="cv-presets" role="group" aria-label="部品のセット"></div></div>
-        <label class="check"><input type="checkbox" id="cv-unify"><span>パーツの高さをそろえる <small class="hint">1 段 = パーツ 1 個分の高さになり、下から 1 段ずつ組み立て・表示しやすくなる</small></span></label>
-        <select class="input" id="cv-unify-to" hidden>
-          <option value="PLATE">プレートだけ (1 段 = プレート 1 枚)</option>
-          <option value="BRICK">ブリックだけ (1 段 = ブリック 1 個)</option>
-        </select>
+        <input type="checkbox" id="cv-unify" hidden>
+        <select id="cv-unify-to" hidden><option value="PLATE">PLATE</option><option value="BRICK">BRICK</option></select>
         <div id="cv-parts"></div>
         <p class="note">1x1 を外すと、1 マスだけのすき間はとなりの空きにはみ出す 1x2 などで埋めます (形が少し太る)。それでも埋まらない 1 マスは空けたまま (中なら見えない。表面なら小さなくぼみになる)。</p>
-      </div>
-      <div class="box" id="cv-place-box">
-        <h4>置き方 <small class="hint">(変換の結果・プレビューは変わりません)</small></h4>
-        <label class="check"><input type="checkbox" id="cv-replace" checked><span>今のモデルを消してから置く <small class="hint">オフにすると、今のモデルの横に並べて置く</small></span></label>
-        <label class="check"><input type="checkbox" id="cv-keep" checked><span>元のモデルを残す <small class="hint">重ねて表示したり、設定を変えて作り直したりできる</small></span></label>
       </div>
       </div>
     </div>
     <div class="dlg-foot">
-      <p class="foot-warn" id="cv-replace-warn" hidden><span id="cv-replace-text"></span><button class="btn" type="button" id="cv-side-by-side">消さずに横に並べる</button></p>
+      <p class="foot-warn" id="cv-replace-warn" hidden><span id="cv-replace-text"></span></p>
       <button class="btn" value="cancel" type="submit">キャンセル</button>
       <button class="btn primary" value="ok" type="submit" id="cv-ok">変換する</button>
     </div>
@@ -849,6 +830,7 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
         <label class="check"><input type="radio" name="ex-kind" value="obj"><span>Wavefront (.obj) <small class="hint">色付きの 3D モデル (.mtl も入れる)</small></span></label>
         <label class="check"><input type="radio" name="ex-kind" value="stl"><span>STL (.stl) <small class="hint">色なしの形だけ。3D プリンタ向け</small></span></label>
       </div>
+      <div class="row"><button class="btn" id="btn-export-layers" type="button">1 段ずつ全部書き出す (zip)</button><span class="hint">その段のパーツだけの .ldr を段の数だけ作ります</span></div>
       <label class="check" id="ex-only-row" hidden><input type="checkbox" id="ex-only"><span id="ex-only-text">表示中のところまでだけ書き出す</span></label>
       <p class="note">ファイルは zip にまとめて保存します (この画面から保存できる種類に限りがあるため)。.fbx の書き出しはありません。代わりに .glb をお使いください。</p>
     </div>
@@ -882,14 +864,12 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
   <form method="dialog" class="dlg">
     <div class="dlg-head"><h2 id="hp-title">使い方</h2><button class="btn x" value="cancel" type="submit" aria-label="閉じる">×</button></div>
     <div class="dlg-body">
-      <p>上の段階バーの順に進めます。左の欄の下の「次へ」で次の段階へ、段階バーを押すとどの段階へもすぐ移れます。</p>
+      <p>上の段階バーの順に進めます。左の欄の下の「次へ」で次の段階へ、段階バーを押すとどの段階へもすぐ移れます。できたものは、右上の「保存」でいつでもファイルにできます。</p>
       <ol class="help-steps">
-        <li><b>ひらく</b>: 3D モデル (.glb など) かサンプルを選びます。3D モデルを使わずに「自由に作る」こともできます。</li>
-        <li><b>変換</b>: 大きさや細かさを決めてブロックにします。あとから設定を変えて作り直せます。</li>
+        <li><b>ひらく</b>: 3D モデル (.glb など) かサンプルを選ぶと、ブロックに変換します。あとから「変換しなおす」で設定を変えて作り直せます。3D モデルを使わずに「自由に作る」こともできます。</li>
         <li><b>編集</b> (飛ばしてもよい): 部品を置く・塗る・消す・動かす。部品と色を選んで「置く」にすると、クリックしたところにポッチの格子にそろえて置けます。</li>
         <li><b>部品をそろえる</b>: 必要な部品と数の一覧です。組み立てる前に手元にそろえましょう。</li>
-        <li><b>組み立てる</b>: 下から 1 段ずつ表示します。その段で使う部品も出ます。AR で本物の基礎板に重ねて見ることもできます。</li>
-        <li><b>保存</b>: 設計図 (.ldr) や 3D モデル (.glb / .obj / .stl) に書き出します。</li>
+        <li><b>組み立てる</b>: 下から 1 段ずつ、または 1 個ずつ表示します。その段で使う部品も出ます。完成見本の表示や、AR で本物の基礎板に重ねて見ることもできます。</li>
       </ol>
       <dl class="keys">
         <dt><span class="kbd">クリック</span></dt><dd>パーツを選ぶ (Shift で追加)</dd>
@@ -1792,17 +1772,15 @@ function createMachine(name,{ initial, states, onChange = null }) {
 }
 
 // ---------------------------------------------------------------- 段階 (画面の流れ)
-// ひらく → 変換 → 編集 (飛ばせる) → 部品をそろえる → 組み立てる → 保存
+// ひらく (変換も) → 編集 (飛ばせる) → 部品をそろえる → 組み立てる。保存は流れとは別 (看板の「保存」)
 const STEPS = [
   { id: "open", label: "ひらく", short: "ひらく" },
-  { id: "convert", label: "変換", short: "変換" },
   { id: "edit", label: "編集", short: "編集", optional: true },
   { id: "parts", label: "部品をそろえる", short: "部品" },
   { id: "build", label: "組み立てる", short: "組立" },
-  { id: "save", label: "保存", short: "保存" },
 ];
 const STEP_IDS = STEPS.map((s) => s.id);
-const LEGACY_TABS = { build: "edit", order: "build", convert: "convert", list: "parts" };
+const LEGACY_TABS = { build: "edit", order: "build", convert: "open", list: "parts" };
 // ブロックが 0 個のとき押せるのは「ひらく」と「編集」(自由に作る) だけ
 function stepEnabled(id, { parts }) {
   if (!STEP_IDS.includes(id)) return false;
@@ -3123,7 +3101,7 @@ const S = {
   sel: new Set(), active: null,
   partChoice: "3001.dat", ext: null, color: 4, stack: true,
   get placing() { return this.tool === "place"; },  // 置くモード = 道具が「置く」(別に持たない)
-  ghostRot: 0, step: "", lastLayer: 0,
+  ghostRot: 0, step: "", lastLayer: 0, lastPiece: 0, buildMode: "layer", showSample: false, complete: false,
   tool: "select", prevTool: "select",  // 選ぶ / 範囲で選ぶ / 置く / 塗る / スポイト / 消しゴム
   baseplate: true, baseSize: 48,
   layer: 0, piece: 0, playing: false, interval: 0.15,
@@ -3200,7 +3178,7 @@ function edit(fn, structural = true) {
 function changed(structural = true) {
   S.ver++;
   if (structural && (S.layer || S.piece)) showAll();
-  if (structural) S.lastLayer = 0;  // 段の数が変わるので、最初から
+  if (structural) { S.lastLayer = 0; S.lastPiece = 0; S.complete = false; }  // 段の数が変わるので、最初から
   refreshAll();
   saveLocal();
 }
@@ -3288,7 +3266,7 @@ function setLayer(n) {
   const L = steps().levels.length;
   n = Math.max(0, Math.min(n | 0, L));
   S.layer = n;
-  if (n) S.lastLayer = n;  // 「組み立てる」に戻ったとき、ここから再開する
+  if (n) { S.lastLayer = n; S.buildMode = "layer"; S.complete = false; }  // 「組み立てる」に戻ったとき、ここから再開する
   if (n) S.piece = 0;
   refreshView(); refreshOrder();
 }
@@ -3296,6 +3274,7 @@ function setPiece(n) {
   const total = S.parts.length;
   n = Math.max(0, Math.min(n | 0, total));
   S.piece = n;
+  if (n) { S.lastPiece = n; S.buildMode = "piece"; S.complete = false; }
   if (n) {
     S.layer = 0;
     const newest = steps().seq[n - 1][0];
@@ -3339,7 +3318,6 @@ function togglePlay() {
 }
 function refreshPlayButton() {
   syncViewAttrs();
-  $("btn-play").textContent = S.playing ? "❚❚ 止める" : "▶ 自動で組み立てる";
 }
 
 // ---------------------------------------------------------------- 元のモデルの保存 (IndexedDB)
@@ -4759,8 +4737,9 @@ canvas.addEventListener("pointerup", (ev) => {
 function refreshView() { rebuildParts(); refreshHud(); }
 function refreshAll() {
   refreshView(); refreshStatus(); refreshOrder(); refreshConvert(); scheduleList();
-  $("btn-undo").disabled = $("btn-undo2").disabled = !undoStack.length;
-  $("btn-redo").disabled = $("btn-redo2").disabled = !redoStack.length;
+  $("btn-undo2").disabled = !undoStack.length;
+  $("btn-redo2").disabled = !redoStack.length;
+  $("skip-edit-row").hidden = !S.parts.length;
   // パーツが 0 個になったら、押せなくなった段階からは「ひらく」へ戻る
   if (S.step && !stepEnabled(S.step, { parts: S.parts.length })) selectStep("open");
   else if (S.step) refreshStepper();
@@ -4826,53 +4805,83 @@ function refreshOrder() {
       box.append(e);
     }
   }
-  const total = S.parts.length, L = levels.length;
-  $("layer-num").value = S.layer; $("layer-num").max = L;
-  $("piece-num").value = S.piece; $("piece-num").max = total;
-  const shown = S.piece || (S.layer ? partsUpToLayer(S.layer).size : total);
-  $("build-bar").style.width = total ? `${(shown / total) * 100}%` : "0";
-  const ro = $("order-readout");
-  ro.textContent = "";
-  const line = (text, tag = "span", cls = "") => { const e = document.createElement(tag); e.textContent = text; if (cls) e.className = cls; ro.append(e); };
-  if (S.piece && total) {
-    const n = Math.min(S.piece, total);
-    const [newest, step] = seq[n - 1];
-    line(`${n} / ${total} 個目 (${levels.indexOf(step) + 1} / ${L} 段目)`, "b");
-    line(`いま置いた部品: ${partNameJa(newest.part)}・${colorJa(newest.color)}`);
-    if (hungFromAbove(newest, step)) line("上の部品の下側に付ける", "span", "warn");
-  } else if (S.layer && L) {
-    const n = Math.min(S.layer, L);
-    const inLayer = seq.filter(([, s]) => s === levels[n - 1]);
-    const hung = inLayer.filter(([p, s]) => hungFromAbove(p, s)).length;
-    line(`${n} / ${L} 段目を表示中`, "b");
-    line(`この段 ${inLayer.length} パーツ${hung ? `、うち下から差し込む ${hung} 個` : ""}`);
-  } else {
-    line(`全部表示中`, "b");
-    line(`全 ${L} 段・${total} パーツ`);
-  }
-  const what = S.piece ? `${Math.min(S.piece, total)} 個目` : S.layer ? `${Math.min(S.layer, L)} 段目` : "表示中のところ";
-  $("btn-export-shown").textContent = `${what}までを書き出す (.ldr)`;
-  $("btn-export-shown").disabled = !(S.piece || S.layer);
-  $("btn-export-layers").textContent = `1 段ずつ全部書き出す (${L} ファイル)`;
-  $("btn-export-layers").disabled = !L;
   refreshPlayButton();
   refreshBuildbar();
   renderLayerBom();
 }
-// 5. 組み立てる: 作業台の下の大きな段送り
+// 組み立てる: 作業台の下の大きな段送り。1 段ずつ / 1 個ずつ。数字はいま表示しているモデルと同じ所を指す
 function refreshBuildbar() {
   const bar = $("buildbar");
-  bar.hidden = S.step !== "build";
-  if (bar.hidden) return;
-  const L = steps().levels.length, cur = currentLayerNo();
-  const cnt = $("bb-count");
-  cnt.textContent = "";
-  if (cur) cnt.append(`${cur} / ${L} 段目`);
-  else cnt.append(`全 ${L} 段`);
-  if (S.piece) cnt.append(Object.assign(document.createElement("small"), { textContent: `${Math.min(S.piece, S.parts.length)} / ${S.parts.length} 個目` }));
-  $("bb-prev").disabled = !cur || cur <= 1;
-  $("bb-next").disabled = !!cur && cur >= L;
-  $("bb-next").textContent = cur ? "次の段 ▶" : "1 段目から組む ▶";
+  const on = S.step === "build";
+  bar.hidden = !on;
+  $("complete").hidden = !(on && S.complete);
+  refreshSample();
+  if (!on) return;
+  const { seq, levels } = steps();
+  const L = levels.length, N = S.parts.length, mode = S.buildMode;
+  for (const b of $$("[data-bmode]")) b.setAttribute("aria-pressed", String(b.dataset.bmode === mode));
+  const lay = currentLayerNo();
+  const pc = S.piece ? Math.min(S.piece, N) : S.layer ? partsUpToLayer(S.layer).size : 0;
+  const cnt = $("bb-count"), note = $("bb-note");
+  cnt.textContent = ""; note.textContent = "";
+  const small = (t) => Object.assign(document.createElement("small"), { textContent: t });
+  if (!lay) cnt.append(`全 ${L} 段・${N} 個`);
+  else if (mode === "piece") { cnt.append(`${pc} / ${N} 個目`); cnt.append(small(`${lay} / ${L} 段目`)); }
+  else { cnt.append(`${lay} / ${L} 段目`); cnt.append(small(`${pc} / ${N} 個まで`)); }
+  if (S.piece && N) {
+    const [p, st] = seq[Math.min(S.piece, N) - 1];
+    note.append(`いま置く部品: ${partNameJa(p.part)}・${colorJa(p.color)}`);
+    if (hungFromAbove(p, st)) note.append(" ", Object.assign(document.createElement("span"), { className: "warn", textContent: "(上の部品の下側に付ける)" }));
+  }
+  const atEnd = mode === "piece" ? pc >= N : lay >= L;
+  $("bb-prev").disabled = !lay && !S.complete;
+  $("bb-prev").textContent = mode === "piece" ? "◀ 前の部品" : "◀ 前の段";
+  $("bb-next").disabled = !N;
+  $("bb-next").textContent = !lay ? (mode === "piece" ? "1 個目から組む ▶" : "1 段目から組む ▶")
+    : atEnd ? "完成！ ▶" : mode === "piece" ? "次の部品 ▶" : "次の段 ▶";
+}
+function buildNext() {
+  const N = S.parts.length, L = steps().levels.length, lay = currentLayerNo();
+  if (!N) return;
+  if (S.buildMode === "piece") {
+    const pc = S.piece || (S.layer ? partsUpToLayer(S.layer).size : 0);
+    if (lay && pc >= N) return finishBuild();
+    setPiece(pc + 1);
+  } else {
+    if (lay && lay >= L) return finishBuild();
+    setLayer(lay + 1);
+  }
+}
+function buildPrev() {
+  const N = S.parts.length, L = steps().levels.length;
+  if (S.complete) {  // 完成から戻る: 最後の段・最後の部品へ
+    if (S.buildMode === "piece") setPiece(N); else setLayer(L);
+    return;
+  }
+  if (S.buildMode === "piece") setPiece(Math.max(1, (S.piece || partsUpToLayer(S.layer).size) - 1));
+  else setLayer(Math.max(1, currentLayerNo() - 1));
+}
+function setBuildMode(mode) {
+  if (mode === S.buildMode && (S.layer || S.piece)) return;
+  const lay = currentLayerNo();
+  if (mode === "piece") setPiece(S.layer ? partsUpToLayer(S.layer).size : S.piece || S.lastPiece || 1);  // 同じ所まで (表示は変わらない)
+  else setLayer(lay || S.lastLayer || 1);
+}
+function finishBuild() {
+  showAll(); S.complete = true;
+  refreshView(); refreshOrder();
+  $("complete-img").src = modelPicture() || "";
+}
+// 完成見本 (できあがりの絵)。パーツが変わったときだけ描き直す
+let _picKey = -1, _picUrl = null;
+function modelPicture() {
+  if (_picKey !== S.ver) { _picKey = S.ver; _picUrl = S.parts.length ? renderPreview(S.parts, 360) : null; }
+  return _picUrl;
+}
+function refreshSample() {
+  const on = S.step === "build" && S.showSample && S.parts.length > 0 && !S.complete;
+  $("sample-card").hidden = !on;
+  if (on) { const u = modelPicture(); if ($("sample-img").src !== u) $("sample-img").src = u || ""; }
 }
 // 今見ている段 (1 始まり)。1 個ずつのときは、その個が入っている段。全部表示なら 0
 function currentLayerNo() {
@@ -4884,7 +4893,8 @@ let _bomKey = "";
 async function renderLayerBom() {
   if (S.step !== "build") return;
   const box = $("layer-bom"), n = currentLayerNo(), { seq, levels } = steps();
-  const key = `${S.ver}|${n}`;
+  const now = S.piece && S.parts.length ? seq[Math.min(S.piece, seq.length) - 1][0] : null;
+  const key = `${S.ver}|${n}|${now ? now.part + "|" + now.color : ""}`;
   if (key === _bomKey) return;
   _bomKey = key;
   $("layer-bom-title").textContent = n ? `${n} 段目の部品` : "この段の部品";
@@ -4913,6 +4923,7 @@ async function renderLayerBom() {
     c.append(dot, colorJa(r.color));
     b.append(nm, c);
     const q = tr.insertCell(); q.className = "q"; q.textContent = `×${r.qty}`;
+    if (now && now.part === r.part && now.color === r.color) tr.className = "now";
   }
   box.textContent = "";
   box.append(t);
@@ -5097,8 +5108,6 @@ function buildConvertDialog() {
     schedulePreview();
   });
   $("cv-presets").addEventListener("click", () => schedulePreview());
-  $("cv-replace").addEventListener("change", refreshReplaceWarn);
-  $("cv-side-by-side").onclick = () => { $("cv-replace").checked = false; refreshReplaceWarn(); };
   // 「変換する」: ダイアログの close イベントは裏のタブで遅れることがあるので、送信 (submit) のときに始める
   $("cv-form").addEventListener("submit", (e) => {
     if (!e.submitter || e.submitter.value !== "ok" || !CV.model) return;
@@ -5113,7 +5122,6 @@ function openConvertDialog(model, group = null) {
   CV.group = group;  // null = 新しく変換 / 名前 = その変換モデルを作り直す
   $("cv-title").textContent = group ? "設定を変えて作り直す" : "ブロックに変換";
   $("cv-ok").textContent = group ? "作り直す" : "変換する";
-  $("cv-place-box").hidden = !!group;
   $("cv-file").textContent = group ? `${group} (${model.name}${model.ext}) を、今の設定から作り直します。`
     : `${model.name}${model.ext} をブロックに置き換えます。`;
   CV.updateRes();
@@ -5171,7 +5179,7 @@ function initPreview() {
 // 「変換する」の横: 今あるパーツが消えるときだけ知らせる (横に並べる方へ 1 回で切り替えられる)
 function refreshReplaceWarn() {
   const n = S.parts.length;
-  const on = !CV.group && n > 0 && $("cv-replace").checked;
+  const on = !CV.group && n > 0;
   $("cv-replace-warn").hidden = !on;
   if (on) $("cv-replace-text").textContent = `今ある ${n} パーツは消えます (元に戻すで戻せます)`;
 }
@@ -5336,8 +5344,8 @@ function convertOptions() {
   const allowed = new Set($$("#cv-parts input[data-part]").filter((c) => c.checked).map((c) => c.dataset.part));
   return {
     scaleMode: "SIZE", size: CV.size, hollow: $("cv-hollow").checked, basicColors: $("cv-basic").checked,
-    keepSource: $("cv-keep").checked, bottomUpOnly: $("cv-bu").checked, height, replace: $("cv-replace").checked,
-    symmetry: $("cv-sym").checked ? $("cv-sym-axis").value : null, smooth: Number($("cv-smooth").value), thin: $("cv-thin").checked,
+    keepSource: true, bottomUpOnly: $("cv-bu").checked, height, replace: true,
+    symmetry: $("cv-sym").checked ? $("cv-sym-axis").value : null, smooth: Number($("cv-smooth").value), thin: false,
     allowed: allowed.size === CONVERT_PARTS.length ? null : allowed,
   };
 }
@@ -5401,7 +5409,7 @@ async function runConvert(opts = convertOptions(), model = CV.model, silent = fa
     const [kind, msg] = convertReport(created, res.info);
     if (!silent) toast(msg + `。(${((performance.now() - t0) / 1000).toFixed(1)} 秒)`, kind, 12000);
     refreshAll();
-    if (!silent && created.length) selectStep("convert");  // 変換できたら「変換」の段階へ (作り直し・重ねて表示が見える)
+    if (!silent && created.length) selectStep("open");  // 変換できたら「ひらく」へ (変換しなおす・重ねて表示が見える)
   } catch (e) {
     console.error(e);
     toast(`変換できませんでした: ${e.message || e}`, "err");
@@ -5425,7 +5433,6 @@ let _reconvRes = null;
 function refreshConvert() {
   const name = convertedGroup();
   $("reconv").hidden = !name;
-  $("convert-none").hidden = !!name;  // 変換したモデルがないときは「ひらく」への案内
   if (!name) return;
   const conf = S.groups.get(name).conf;
   const n = S.parts.filter((p) => p.group === name).length;
@@ -5499,7 +5506,6 @@ function openReconvertDialog() {
   $("cv-sym").checked = !!conf.symmetry;
   $("cv-sym-axis").value = conf.symmetry || "y";
   $("cv-smooth").value = String(conf.smooth || 0);
-  $("cv-thin").checked = !!conf.thin;
   $("cv-unify").checked = conf.height && conf.height !== "MIXED";
   if ($("cv-unify").checked) $("cv-unify-to").value = conf.height;
   const allowed = conf.allowed ? new Set(conf.allowed) : null;
@@ -5737,12 +5743,16 @@ function refreshStepper() {
 }
 function onLeaveStep(from, to) {
   if (from === "build") {
+    S.complete = false;
     if (arActive()) stopAR();  // AR のまま別の段階へは行かない (デジタルに戻してから移る)
     showAll(); refreshView(); refreshOrder();  // 決まり 7: 段の表示は全部表示に戻す
   }
 }
 function onEnterStep(to) {
-  if (to === "build") { _bomKey = ""; setLayer(S.lastLayer || 1); }  // 前に見ていた段から。初めてなら 1 段目
+  if (to === "build") {  // 前に見ていた所から。初めてなら 1 段目
+    _bomKey = "";
+    if (S.buildMode === "piece") setPiece(S.lastPiece || 1); else setLayer(S.lastLayer || 1);
+  }
   else {
     if (S.layer || S.piece) { showAll(); refreshView(); refreshOrder(); }  // 5 の外では、いつも全部表示
     refreshBuildbar();
@@ -5777,11 +5787,21 @@ function wire() {
   $("btn-open").onclick = $("empty-open").onclick = () => $("file-open").click();
   $("empty-sample").onclick = () => openSample("duck");
   $("empty-place").onclick = $("btn-freebuild").onclick = () => { selectStep("edit"); setPlacing(true); };
-  $("btn-goto-open").onclick = () => selectStep("open");
+  $("btn-save").onclick = openExportDialog;
+  for (const b of $$("[data-bmode]")) b.onclick = () => setBuildMode(b.dataset.bmode);
+  $("complete-again").onclick = () => { if (S.buildMode === "piece") setPiece(1); else setLayer(1); };
+  $("complete-save").onclick = openExportDialog;
+  $("complete-close").onclick = () => { S.complete = false; refreshBuildbar(); };
+  try { S.showSample = localStorage.getItem("pocchi-kobo-sample") === "1"; } catch { /* 既定はオフ */ }
+  $("opt-sample").checked = S.showSample;
+  $("opt-sample").onchange = (e) => {
+    S.showSample = e.target.checked; refreshSample();
+    try { localStorage.setItem("pocchi-kobo-sample", S.showSample ? "1" : "0"); } catch { /* 覚えなくても困らない */ }
+  };
   // AR の操作バーの高さ (狭い画面では折り返して高くなる) を、段送りバーの位置に使う
   new ResizeObserver(() => document.documentElement.style.setProperty("--arbar-h", $("arbar").offsetHeight + "px")).observe($("arbar"));
-  $("bb-prev").onclick = () => setLayer(currentLayerNo() - 1 || 1);
-  $("bb-next").onclick = () => setLayer(currentLayerNo() + 1);
+  $("bb-prev").onclick = buildPrev;
+  $("bb-next").onclick = buildNext;
   $("btn-skip-edit").onclick = () => selectStep("parts");
   $("file-open").onchange = (e) => { openFiles(e.target.files); e.target.value = ""; };
   // サンプル
@@ -5790,7 +5810,7 @@ function wire() {
     chip.onclick = () => openSample(key);
     $("sample-row").append(chip);
   }
-  $("btn-export").onclick = openExportDialog;
+
   $("ex-form").addEventListener("submit", (e) => {
     if (!e.submitter || e.submitter.value !== "ok") return;
     const kind = $$("input[name=ex-kind]").find((r) => r.checked).value;
@@ -5799,8 +5819,8 @@ function wire() {
     const only = $("ex-only").checked ? previewParts() : null;
     doExport(kind, name, only, only ? previewSuffix()[0] : "");
   });
-  $("btn-undo").onclick = $("btn-undo2").onclick = undo;
-  $("btn-redo").onclick = $("btn-redo2").onclick = redo;
+  $("btn-undo2").onclick = undo;
+  $("btn-redo2").onclick = redo;
   $("btn-help").onclick = () => $("dlg-help").showModal();
   // つくる
   for (const b of $$("[data-shelf]")) b.onclick = () => {
@@ -5860,15 +5880,7 @@ function wire() {
     saveLocal();
   };
   // 組み立て順
-  $("layer-up").onclick = () => layerStep(1); $("layer-down").onclick = () => layerStep(-1);
-  $("piece-up").onclick = () => pieceStep(1); $("piece-down").onclick = () => pieceStep(-1);
-  $("layer-num").onchange = (e) => { stopPlay(); setLayer(Number(e.target.value)); };
-  $("piece-num").onchange = (e) => { stopPlay(); setPiece(Number(e.target.value)); };
-  $("btn-play").onclick = togglePlay;
-  $("play-speed").onchange = (e) => { S.interval = Math.max(0.02, Math.min(2, Number(e.target.value) || 0.15)); e.target.value = S.interval; };
-  $("btn-showall").onclick = () => { showAll(); refreshView(); refreshOrder(); };
-  $("btn-export-shown").onclick = () => doExport("ldr", safeName(S.lastName), previewParts(), previewSuffix()[0]);
-  $("btn-export-layers").onclick = exportLayers;
+  $("btn-export-layers").onclick = () => { $("dlg-export").close(); exportLayers(); };
   // 変換
   $("reconv-bu").onchange = (e) => { S.convBottomUp = e.target.checked; };
   $("opt-source").onchange = (e) => { S.showSource = e.target.checked; rebuildOverlay(); refreshHud(); };
@@ -5935,15 +5947,11 @@ function onKey(e) {
   if (k === "c" || k === "C") return paintSelected();
   if (k === "f" || k === "F") return frameView();
   // 段の表示は「組み立てる」の中だけ (決まり 7)。ほかの段階で押したら、まず「組み立てる」へ移る
-  if (["[", "]", ",", ".", " "].includes(k) && S.step !== "build") {
-    if (k === " ") handled();
-    return selectStep("build");
-  }
+  if (["[", "]", ",", "."].includes(k) && S.step !== "build") return selectStep("build");
   if (k === "[") return layerStep(-1);
   if (k === "]") return layerStep(1);
   if (k === ",") return pieceStep(-1);
   if (k === ".") return pieceStep(1);
-  if (k === " ") { handled(); return togglePlay(); }
 }
 
 // ---------------------------------------------------------------- スマホ: 看板のボタンをスクロールで隠す
