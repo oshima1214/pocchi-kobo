@@ -3101,7 +3101,7 @@ const S = {
   sel: new Set(), active: null,
   partChoice: "3001.dat", ext: null, color: 4, stack: true,
   get placing() { return this.tool === "place"; },  // 置くモード = 道具が「置く」(別に持たない)
-  ghostRot: 0, step: "", lastLayer: 0, lastPiece: 0, buildMode: "layer", showSample: false, complete: false,
+  ghostRot: 0, step: "", zero: false, resume: null, buildMode: "layer", showSample: false, complete: false,
   tool: "select", prevTool: "select",  // 選ぶ / 範囲で選ぶ / 置く / 塗る / スポイト / 消しゴム
   baseplate: true, baseSize: 48,
   layer: 0, piece: 0, playing: false, interval: 0.15,
@@ -3177,8 +3177,8 @@ function edit(fn, structural = true) {
 }
 function changed(structural = true) {
   S.ver++;
-  if (structural && (S.layer || S.piece)) showAll();
-  if (structural) { S.lastLayer = 0; S.lastPiece = 0; S.complete = false; }  // 段の数が変わるので、最初から
+  if (structural && (S.layer || S.piece || S.zero)) showAll();
+  if (structural) { S.resume = null; S.complete = false; }  // 段の数が変わるので、最初から
   refreshAll();
   saveLocal();
 }
@@ -3242,17 +3242,26 @@ function partsUpToLayer(n) {
   const limit = levels[Math.min(n, levels.length) - 1];
   return new Set(seq.filter(([, s]) => s <= limit).map(([p]) => p));
 }
-// 表示の状態: all (全部) / layer (n 段目まで) / piece (n 個目まで)。S.layer と S.piece はどちらか一方だけが 0 以外
+// 表示の状態: all (全部) / zero (まだ何も置いていない) / layer (n 段目まで) / piece (n 個目まで)。
+// S.layer と S.piece はどちらか一方だけが 0 以外。S.zero は「組み立てる」の 0 段目 (0 個目) で、そのとき両方 0
 function viewState() {
-  return { mode: S.piece ? "piece" : S.layer ? "layer" : "all", n: S.piece || S.layer || 0, playing: !!S.playing };
+  return { mode: S.piece ? "piece" : S.layer ? "layer" : S.zero ? "zero" : "all", n: S.piece || S.layer || 0, playing: !!S.playing };
 }
-function showAll() { stopPlay(); S.layer = 0; S.piece = 0; }  // 全部表示に戻す (描き直しは呼ぶ側で)
+function showAll() { stopPlay(); S.layer = 0; S.piece = 0; S.zero = false; }  // 全部表示に戻す (描き直しは呼ぶ側で)
+// 0 段目 (0 個目): 基礎板だけ。「組み立てる」の始まり
+function goZero() {
+  stopPlay();
+  S.layer = 0; S.piece = 0; S.zero = true; S.resume = 0; S.complete = false;
+  S.sel = new Set(); S.active = null;  // 見えていない部品を選んだままにしない
+  refreshView(); refreshOrder(); refreshStatus();
+}
 function syncViewAttrs() {
   const v = viewState();
   setUi("view", v.mode);
   setUi("playing", v.playing ? "1" : "0");
 }
 function previewParts() {  // いま見せているところまでのパーツ (Set)。全部表示なら null
+  if (S.zero) return new Set();
   if (S.piece) return new Set(steps().seq.slice(0, S.piece).map(([p]) => p));
   if (S.layer) return partsUpToLayer(S.layer);
   return null;
@@ -3266,7 +3275,7 @@ function setLayer(n) {
   const L = steps().levels.length;
   n = Math.max(0, Math.min(n | 0, L));
   S.layer = n;
-  if (n) { S.lastLayer = n; S.buildMode = "layer"; S.complete = false; }  // 「組み立てる」に戻ったとき、ここから再開する
+  if (n) { S.zero = false; S.resume = n; S.buildMode = "layer"; S.complete = false; }  // 「組み立てる」に戻ったとき、ここから再開する
   if (n) S.piece = 0;
   refreshView(); refreshOrder();
 }
@@ -3274,7 +3283,7 @@ function setPiece(n) {
   const total = S.parts.length;
   n = Math.max(0, Math.min(n | 0, total));
   S.piece = n;
-  if (n) { S.lastPiece = n; S.buildMode = "piece"; S.complete = false; }
+  if (n) { S.zero = false; S.resume = n; S.buildMode = "piece"; S.complete = false; }
   if (n) {
     S.layer = 0;
     const newest = steps().seq[n - 1][0];
@@ -4825,7 +4834,10 @@ function refreshBuildbar() {
   const cnt = $("bb-count"), note = $("bb-note");
   cnt.textContent = ""; note.textContent = "";
   const small = (t) => Object.assign(document.createElement("small"), { textContent: t });
-  if (!lay) cnt.append(`全 ${L} 段・${N} 個`);
+  if (S.zero) {
+    if (mode === "piece") { cnt.append(`0 / ${N} 個目`); cnt.append(small(`0 / ${L} 段目`)); }
+    else { cnt.append(`0 / ${L} 段目`); cnt.append(small(`0 / ${N} 個まで`)); }
+  } else if (!lay) cnt.append(`全 ${L} 段・${N} 個`);
   else if (mode === "piece") { cnt.append(`${pc} / ${N} 個目`); cnt.append(small(`${lay} / ${L} 段目`)); }
   else { cnt.append(`${lay} / ${L} 段目`); cnt.append(small(`${pc} / ${N} 個まで`)); }
   if (S.piece && N) {
@@ -4834,10 +4846,10 @@ function refreshBuildbar() {
     if (hungFromAbove(p, st)) note.append(" ", Object.assign(document.createElement("span"), { className: "warn", textContent: "(上の部品の下側に付ける)" }));
   }
   const atEnd = mode === "piece" ? pc >= N : lay >= L;
-  $("bb-prev").disabled = !lay && !S.complete;
+  $("bb-prev").disabled = (!lay || S.zero) && !S.complete;
   $("bb-prev").textContent = mode === "piece" ? "◀ 前の部品" : "◀ 前の段";
   $("bb-next").disabled = !N;
-  $("bb-next").textContent = !lay ? (mode === "piece" ? "1 個目から組む ▶" : "1 段目から組む ▶")
+  $("bb-next").textContent = !lay || S.zero ? (mode === "piece" ? "1 個目から組む ▶" : "1 段目から組む ▶")
     : atEnd ? "完成！ ▶" : mode === "piece" ? "次の部品 ▶" : "次の段 ▶";
 }
 function buildNext() {
@@ -4858,14 +4870,15 @@ function buildPrev() {
     if (S.buildMode === "piece") setPiece(N); else setLayer(L);
     return;
   }
-  if (S.buildMode === "piece") setPiece(Math.max(1, (S.piece || partsUpToLayer(S.layer).size) - 1));
-  else setLayer(Math.max(1, currentLayerNo() - 1));
+  const to = S.buildMode === "piece" ? (S.piece || partsUpToLayer(S.layer).size) - 1 : currentLayerNo() - 1;
+  if (to <= 0) return goZero();  // 1 段目 (1 個目) の前は 0: 基礎板だけ
+  if (S.buildMode === "piece") setPiece(to); else setLayer(to);
 }
 function setBuildMode(mode) {
-  if (mode === S.buildMode && (S.layer || S.piece)) return;
-  const lay = currentLayerNo();
-  if (mode === "piece") setPiece(S.layer ? partsUpToLayer(S.layer).size : S.piece || S.lastPiece || 1);  // 同じ所まで (表示は変わらない)
-  else setLayer(lay || S.lastLayer || 1);
+  if (S.zero || !(S.layer || S.piece)) { S.buildMode = mode; return goZero(); }  // 0 のまま (全部表示からは 0 へ)
+  if (mode === S.buildMode) return;
+  if (mode === "piece") setPiece(partsUpToLayer(S.layer).size);  // 同じ所まで (表示は変わらない)
+  else setLayer(currentLayerNo());
 }
 function finishBuild() {
   showAll(); S.complete = true;
@@ -4892,12 +4905,12 @@ function currentLayerNo() {
 let _bomKey = "";
 async function renderLayerBom() {
   if (S.step !== "build") return;
-  const box = $("layer-bom"), n = currentLayerNo(), { seq, levels } = steps();
+  const { seq, levels } = steps(), box = $("layer-bom"), n = S.zero && levels.length ? 1 : currentLayerNo();
   const now = S.piece && S.parts.length ? seq[Math.min(S.piece, seq.length) - 1][0] : null;
-  const key = `${S.ver}|${n}|${now ? now.part + "|" + now.color : ""}`;
+  const key = `${S.ver}|${n}|${S.zero ? "z" : ""}|${now ? now.part + "|" + now.color : ""}`;
   if (key === _bomKey) return;
   _bomKey = key;
-  $("layer-bom-title").textContent = n ? `${n} 段目の部品` : "この段の部品";
+  $("layer-bom-title").textContent = S.zero && n ? "これから組む 1 段目の部品" : n ? `${n} 段目の部品` : "この段の部品";
   box.textContent = "";
   if (!n) {
     box.append(Object.assign(document.createElement("p"), { className: "empty-note", textContent: "「1 段目から組む」を押すと、その段で使う部品が出ます。" }));
@@ -5751,10 +5764,11 @@ function onLeaveStep(from, to) {
 function onEnterStep(to) {
   if (to === "build") {  // 前に見ていた所から。初めてなら 1 段目
     _bomKey = "";
-    if (S.buildMode === "piece") setPiece(S.lastPiece || 1); else setLayer(S.lastLayer || 1);
+    if (!S.resume) goZero();  // 初めて (または 0 で出た) なら 0 から: 基礎板だけ
+    else if (S.buildMode === "piece") setPiece(S.resume); else setLayer(S.resume);
   }
   else {
-    if (S.layer || S.piece) { showAll(); refreshView(); refreshOrder(); }  // 5 の外では、いつも全部表示
+    if (S.layer || S.piece || S.zero) { showAll(); refreshView(); refreshOrder(); }  // 組み立てるの外では、いつも全部表示
     refreshBuildbar();
   }
 }
@@ -5789,7 +5803,7 @@ function wire() {
   $("empty-place").onclick = $("btn-freebuild").onclick = () => { selectStep("edit"); setPlacing(true); };
   $("btn-save").onclick = openExportDialog;
   for (const b of $$("[data-bmode]")) b.onclick = () => setBuildMode(b.dataset.bmode);
-  $("complete-again").onclick = () => { if (S.buildMode === "piece") setPiece(1); else setLayer(1); };
+  $("complete-again").onclick = goZero;
   $("complete-save").onclick = openExportDialog;
   $("complete-close").onclick = () => { S.complete = false; refreshBuildbar(); };
   try { S.showSample = localStorage.getItem("pocchi-kobo-sample") === "1"; } catch { /* 既定はオフ */ }
@@ -6067,7 +6081,7 @@ function whenIdle(timeout = 20000) {
 window.__pocchi = { state: appState, whenIdle, machines: { gesture: GESTURE, preview: PREVIEW, clear: CLEAR, ar: AR }, cancelGesture,
   setMode, ar: { data: AR_DATA, solve: arSolve, applyPose: applyArPose, setCrop: setArCrop, cropToPlate: arCropToPlate, unwarp: arUnwarp, finishCorners: arFinishCorners, cover: arCover, toStage: arToStage, corners: arPlateCorners, camera },
   setStep: (id) => selectStep(id), setTab: (name) => selectStep(stepFromSaved(name, true, true)), openPane, closePane, showAll: () => { showAll(); refreshView(); refreshOrder(); },
-  S, steps, setLayer, setPiece, layerStep, pieceStep, togglePlay, runConvert, reconvert, openFiles, openSample,
+  S, steps, setLayer, setPiece, goZero, layerStep, pieceStep, togglePlay, runConvert, reconvert, openFiles, openSample,
   exportZip, checkParts, undo, redo, addPart, moveSelected, rotateSelected, deleteSelected, duplicateSelected, setPlacing,
   placeTarget: () => placeTarget(), updateGhost, placeGhost, frameView, renderList, previewParts, convertModel, JSZip,
   DRAG, CV, renderer, detectSymmetry, voxelizeModel, setTool, selectWhere, selectConnected, replaceSelected, splitSelected,
