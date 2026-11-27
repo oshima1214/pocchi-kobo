@@ -271,6 +271,10 @@ body[data-ui-step="build"] .hud { display: none; }  /* 何段目かは上の小�
 body[data-ui-ar="calibrating"] .build-info, body[data-ui-ar="cropping"] .build-info, body[data-ui-ar="starting"] .build-info { display: none; }  /* 四隅を押す間は映像を広く */
 #layer-bom .plist img { width: 40px; height: 40px; }
 #layer-bom .plist tr.now td { background: color-mix(in srgb, var(--sun) 35%, transparent); }
+.build-warn { display: grid; gap: 6px; padding: 10px 12px; border-radius: var(--r); border: 2px solid var(--brick);
+  background: color-mix(in srgb, var(--brick) 8%, var(--paper)); font-size: 13px; }
+.build-warn[hidden] { display: none; }
+.build-warn b { color: var(--brick); }
 .sample-card { position: absolute; left: 12px; top: 12px; z-index: 5; background: var(--chip); border-radius: 12px; box-shadow: var(--shadow);
   padding: 6px; display: grid; gap: 2px; width: 180px; }
 .sample-card[hidden] { display: none; }
@@ -622,6 +626,11 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
 
         <!-- 4. 組み立てる -->
         <section class="panel" id="step-build" data-step-panel hidden>
+          <div class="build-warn" id="build-warn" hidden role="alert">
+            <b>⚠ 組み立てで気になる所があります</b>
+            <span id="build-warn-text"></span>
+            <button class="btn" id="build-warn-go" type="button">編集で確かめる (選んで表示)</button>
+          </div>
           <label class="check"><input type="checkbox" id="opt-sample"><span>完成見本を表示 <small class="hint">作業台の左上に、できあがりの絵を出す</small></span></label>
           <div class="sec">
             <h3 id="layer-bom-title">この段の部品</h3>
@@ -1589,9 +1598,13 @@ function checkBuild(parts) {
     for (const x of g) seen.add(x);
     groups.push(g);
   }
-  groups.sort((a, b) => b.size - a.size);
+  // 基礎板 (下の面の高さ 0) に付いているまとまりだけが正しく立つ。付いていないまとまりは全部「浮いている」
+  // (いちばん大きなまとまりでも、まるごと宙に浮いていれば浮いている)
   const floating = new Set();
-  for (const g of groups.slice(1)) for (const x of g) floating.add(x);
+  for (const g of groups) {
+    if ([...g].some((x) => partBottom(x) <= 0.001)) continue;
+    for (const x of g) floating.add(x);
+  }
   return { overlapping, floating };
 }
 
@@ -3878,8 +3891,27 @@ function checkParts() {
   const { overlapping, floating } = checkBuild(S.parts);
   S.sel = new Set([...overlapping, ...floating].map((p) => p.id));
   refreshView(); refreshStatus();
-  if (overlapping.size || floating.size) toast(`重なり ${overlapping.size} 個 / 浮いている ${floating.size} 個 (選択しました)`, "warn");
-  else toast("重なりも浮いているパーツもありません");
+  if (overlapping.size || floating.size) toast(`${issueText({ overlapping, floating })} (選択しました)`, "warn", 9000);
+  else toast("重なりも浮いているパーツもありません (どのパーツも基礎板につながっています)");
+}
+// 組み立てで困る所: 重なり・浮いている (基礎板につながっていない)。パーツが変わったときだけ数え直す
+let _issues = { ver: -1 };
+function buildIssues() {
+  if (_issues.ver !== S.ver) _issues = { ver: S.ver, ...checkBuild(S.parts) };
+  return _issues;
+}
+function issueText({ overlapping, floating }) {
+  const out = [];
+  if (floating.size) out.push(`基礎板につながっていない (浮いている) パーツ ${floating.size} 個`);
+  if (overlapping.size) out.push(`ほかと重なっているパーツ ${overlapping.size} 個`);
+  return out.join("、");
+}
+function refreshBuildWarn() {
+  const is = S.step === "build" && S.parts.length ? buildIssues() : null;
+  const bad = !!is && (is.overlapping.size > 0 || is.floating.size > 0);
+  $("build-warn").hidden = !bad;
+  if (bad) $("build-warn-text").textContent = `${issueText(is)}。このままでは実物を組み立てられません。`;
+  return bad;
 }
 function clearAll() {
   if (!S.parts.length) return;
@@ -4880,6 +4912,7 @@ function refreshOrder() {
 // 組み立てる: 作業台の下の大きな段送り。1 段ずつ / 1 個ずつ。数字はいま表示しているモデルと同じ所を指す
 function refreshBuildbar() {
   const on = S.step === "build";
+  refreshBuildWarn();
   $("buildctl").hidden = !on;
   $("build-info").hidden = !on;
   $("complete").hidden = !(on && S.complete);
@@ -5823,6 +5856,7 @@ function onLeaveStep(from, to) {
 function onEnterStep(to) {
   if (to === "build") {  // 前に見ていた所から。初めてなら 1 段目
     _bomKey = "";
+    if (refreshBuildWarn()) toast(`組み立てで気になる所があります: ${issueText(buildIssues())}。左の欄の「編集で確かめる」で選んで見られます`, "warn", 10000);
     if (!S.resume) goZero();  // 初めて (または 0 で出た) なら 0 から: 基礎板だけ
     else if (S.buildMode === "piece") setPiece(S.resume); else setLayer(S.resume);
   }
@@ -5861,6 +5895,7 @@ function wire() {
   $("empty-sample").onclick = () => openSample("duck");
   $("empty-place").onclick = $("btn-freebuild").onclick = () => { selectStep("edit"); setPlacing(true); };
   $("btn-save").onclick = openExportDialog;
+  $("build-warn-go").onclick = () => { selectStep("edit"); checkParts(); };
   for (const b of $$("[data-bmode]")) b.onclick = () => setBuildMode(b.dataset.bmode);
   $("complete-again").onclick = goZero;
   $("complete-save").onclick = openExportDialog;
