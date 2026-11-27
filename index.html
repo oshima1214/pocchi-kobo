@@ -6,7 +6,7 @@
 <style>body{margin:0}img{max-width:100%}</style>
 </head>
 <body>
-<title>デジタルレゴブロック</title>
+<title>デジタル・レゴブロック</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -106,6 +106,19 @@ button, input, select { font: inherit; color: inherit; }
 .menu-list button:hover { background: var(--tray); }
 .menu-list small { color: var(--muted); display: block; }
 
+/* ---- タイトル画面: 3 秒ほど出して消える (押すとすぐ消える) */
+.splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: var(--sun); color: #16181B; cursor: pointer;
+  animation: splash-out .5s ease 2.6s forwards; }
+.splash.out { animation: splash-out .25s ease forwards; }
+.splash-in { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 24px; animation: splash-in .6s ease both; }
+.splash svg { width: 96px; height: 96px; }
+.splash h1 { margin: 6px 0 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(28px, 7vw, 48px); letter-spacing: .02em; }
+.splash p { margin: 0; font-weight: 700; font-size: 16px; }
+.splash small { font-weight: 700; opacity: .7; }
+@keyframes splash-in { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes splash-out { to { opacity: 0; visibility: hidden; } }
+@media (prefers-reduced-motion: reduce) { .splash-in { animation: none; } }
+
 /* ---- 本体 */
 .main { display: grid; grid-template-columns: 360px minmax(0, 1fr); min-height: 0; }
 .side { background: var(--tray); border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; min-width: 0; }
@@ -127,7 +140,7 @@ button, input, select { font: inherit; color: inherit; }
 .stepbar button[aria-current="step"] .sn { background: var(--sun); color: #16181B; }
 .stepbar button:disabled { opacity: .45; cursor: default; }
 /* 次へ / 戻る (左の欄の下に貼り付け) */
-.stepnav { display: flex; gap: 8px; padding: 10px 12px; background: var(--paper); border-top: 1px solid var(--line); }
+.stepnav { display: flex; gap: 8px; padding: 10px 12px; }
 .stepnav .btn { min-height: 46px; font-family: var(--font-display); }
 .stepnav .btn[hidden] { display: none; }
 .btn.big { min-height: 52px; font-size: 16px; }
@@ -242,23 +255,21 @@ input[type="range"] { accent-color: var(--brick); min-width: 0; }
 .views { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 /* 5. 組み立てる: 作業台を広く、下に大きな段送り */
 @media (min-width: 861px) { body[data-ui-step="build"] .main { grid-template-columns: 260px minmax(0, 1fr); } }
-.buildbar { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 6; display: grid; gap: 6px;
-  max-width: 720px; margin-inline: auto; padding: 8px; border-radius: 16px; background: var(--chip); box-shadow: var(--shadow); }
-.buildbar[hidden] { display: none; }
-.buildbar .bb { min-height: 58px; font-size: 18px; font-family: var(--font-display); padding: 0 18px; }
-.bb-row { display: flex; align-items: center; gap: 10px; }
-.bb-mode { justify-self: center; }
-.bb-note { text-align: center; font-size: 13px; font-weight: 700; min-height: 1em; }
+.side-foot { background: var(--paper); border-top: 1px solid var(--line); }
+.buildctl { display: grid; gap: 8px; padding: 10px 12px 0; }
+.buildctl[hidden] { display: none; }
+.buildctl .bb-mode { justify-self: center; }
+.buildctl .btn { min-height: 46px; font-family: var(--font-display); }
+.build-info { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 5; max-width: min(520px, calc(100% - 420px));
+  background: var(--chip); border-radius: 12px; box-shadow: var(--shadow); padding: 6px 14px; text-align: center; pointer-events: none; }
+.build-info[hidden] { display: none; }
+.bb-count { font-family: var(--font-display); font-weight: 800; font-size: 16px; line-height: 1.3; white-space: nowrap; }
+.bb-count small { font-size: 12px; font-weight: 700; color: var(--muted); margin-left: 8px; }
+.bb-note { font-size: 12px; font-weight: 700; }
 .bb-note:empty { display: none; }
 .bb-note .warn { color: var(--brick); }
-.buildbar #bb-next { flex: 1.4; }
-.buildbar #bb-prev { flex: 1; }
-.bb-count { flex: 1; text-align: center; font-family: var(--font-display); font-weight: 800; font-size: 24px; line-height: 1.1; white-space: nowrap; }
-.bb-count small { display: block; font-size: 12px; font-weight: 700; color: var(--muted); }
-body[data-ui-step="build"] .views { bottom: auto; top: 12px; }
-body[data-ui-step="build"] .hud { display: none; }  /* 何段目かは下の段送りに大きく出す */
-.ar-on .buildbar { bottom: calc(var(--arbar-h, 60px) + 20px); }
-body[data-ui-ar="calibrating"] .buildbar, body[data-ui-ar="cropping"] .buildbar, body[data-ui-ar="starting"] .buildbar { display: none; }  /* 四隅を押す間は映像を広く */
+body[data-ui-step="build"] .hud { display: none; }  /* 何段目かは上の小さな表示に出す */
+body[data-ui-ar="calibrating"] .build-info, body[data-ui-ar="cropping"] .build-info, body[data-ui-ar="starting"] .build-info { display: none; }  /* 四隅を押す間は映像を広く */
 #layer-bom .plist img { width: 40px; height: 40px; }
 #layer-bom .plist tr.now td { background: color-mix(in srgb, var(--sun) 35%, transparent); }
 .sample-card { position: absolute; left: 12px; top: 12px; z-index: 5; background: var(--chip); border-radius: 12px; box-shadow: var(--shadow);
@@ -444,7 +455,7 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
   .stepbar button.optional .sn { background: transparent; color: var(--ink); border: 1.5px dashed var(--ink); }
   .stepbar button[aria-current="step"] { background: var(--paper); color: var(--ink); border-top-color: var(--brick); }
   .stepbar button[aria-current="step"] .sn { background: var(--brick); color: #fff; border: 0; }
-  .stepnav { position: sticky; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); z-index: 3; }
+  .side-foot { position: sticky; bottom: calc(58px + env(safe-area-inset-bottom, 0px)); z-index: 3; }
   .topnav .tbtn.icon { width: 36px; padding: 0; }
   #btn-undo, #btn-redo { display: none; }  /* スマホでは「動かす」欄の戻す・やり直すを使う */
   /* お知らせは作業台の右上に小さく */
@@ -459,14 +470,13 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
   .side { border-right: 0; border-top: 1px solid var(--line); }
   .panels { overflow: visible; }
   .brand-tag .tag-more { display: none; }  /* スマホでは「非公式のファンツール」だけ */
-  .brand-name { font-size: 18px; }
+  .brand-name { font-size: 16px; white-space: nowrap; }
   .brand svg { width: 32px; height: 32px; }
   .top { column-gap: 8px; }
   .topnav { width: auto; margin-left: auto; }  /* 看板のボタンは「使い方」だけなので、名前の横に */
-  .buildbar { left: 8px; right: 8px; bottom: 8px; gap: 6px; padding: 6px; }
-  .buildbar .bb { font-size: 15px; padding: 0 10px; white-space: nowrap; }
-  .bb-count { font-size: 20px; }
-  .sample-card { width: 110px; left: 8px; top: 8px; }
+  .build-info { left: 8px; right: 8px; top: 8px; transform: none; max-width: none; padding: 4px 10px; }
+  .bb-count { font-size: 14px; }
+  .sample-card { width: 100px; left: 8px; top: 62px; }
   .ar-guide .hint { display: none; }  /* 狭い画面では説明を省いて、映像を広く */
   .arbar { left: 8px; right: 8px; bottom: 8px; }
   /* AR 中は映像を広く: 作業台を高くし、AR の操作は 1 行 (横にずらして見る) にして段送りと重ならないように */
@@ -479,6 +489,18 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
 @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } .progress i, .topnav { transition: none; } }
 </style>
 
+<div class="splash" id="splash" role="dialog" aria-label="タイトル" title="押すと始まります">
+  <div class="splash-in">
+    <svg viewBox="0 0 40 40" aria-hidden="true">
+        <rect x="3" y="12" width="34" height="24" rx="4" fill="#16181B"/>
+        <rect x="8" y="5" width="10" height="9" rx="3" fill="#16181B"/><rect x="22" y="5" width="10" height="9" rx="3" fill="#16181B"/>
+        <rect x="6.5" y="15" width="27" height="5" rx="2.5" fill="#FFCF00" opacity=".9"/>
+      </svg>
+    <h1>デジタル・レゴブロック</h1>
+    <p>3D モデルをブロックで組み立てる</p>
+    <small>非公式のファンツール</small>
+  </div>
+</div>
 <div class="app">
   <header class="top">
     <div class="brand">
@@ -488,7 +510,7 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
         <rect x="6.5" y="15" width="27" height="5" rx="2.5" fill="#FFCF00" opacity=".9"/>
       </svg>
       <div>
-        <div class="brand-name">デジタルレゴブロック</div>
+        <div class="brand-name">デジタル・レゴブロック</div>
         <div class="brand-tag">非公式のファンツール<span class="tag-more"> · 3D モデルをブロックで組み立てる</span></div>
       </div>
     </div>
@@ -611,14 +633,28 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
           <div class="sec sep">
             <h3>実物の基礎板に重ねる (AR)</h3>
             <p class="hint">Web カメラに映した本物の基礎板の上に、モデルを重ねて見ます。</p>
+            <div class="row"><label class="lbl" for="ar-facing">カメラ</label>
+              <select class="input grow" id="ar-facing"><option value="environment">背面のカメラ</option><option value="user">前面のカメラ (インカメラ)</option></select></div>
             <button class="btn block" id="btn-ar" data-mode="ar" type="button" title="Web カメラに映した本物の基礎板の上に重ねて見る">📷 AR で重ねて見る</button>
           </div>
         </section>
 
       </div>
-      <div class="stepnav" id="stepnav">
-        <button class="btn" id="step-prev" type="button">← 戻る</button>
-        <button class="btn primary grow" id="step-next" type="button">次へ</button>
+      <div class="side-foot">
+        <div class="buildctl" id="buildctl" hidden>
+          <div class="seg bb-mode" role="group" aria-label="進め方">
+            <button type="button" data-bmode="layer" aria-pressed="true">1 段ずつ</button>
+            <button type="button" data-bmode="piece" aria-pressed="false">1 個ずつ</button>
+          </div>
+          <div class="row">
+            <button class="btn grow" id="bb-prev" type="button">◀ 前へ</button>
+            <button class="btn primary grow" id="bb-next" type="button">次へ ▶</button>
+          </div>
+        </div>
+        <div class="stepnav" id="stepnav">
+          <button class="btn" id="step-prev" type="button">← 戻る</button>
+          <button class="btn primary grow" id="step-next" type="button">次へ</button>
+        </div>
       </div>
     </aside>
 
@@ -633,6 +669,7 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
           <p class="hint">カメラに本物の基礎板を映して、四隅のかどを 1 つずつ押します (順番は自由)。基礎板が小さく映るときは「切り抜く」で広げると押しやすくなります。合わせた後は、カメラと基礎板を動かさないでください。</p>
           <div class="row"><select class="input grow" id="ar-plate" aria-label="基礎板の大きさ"></select><button class="btn" id="ar-crop2" type="button">切り抜く</button><button class="btn" id="ar-uncrop2" type="button" hidden>全体に戻す</button><button class="btn" id="ar-undo-tap" type="button">1 つ戻す</button><button class="btn" id="ar-cancel" type="button">やめる</button></div>
         </div>
+        <div class="row"><button class="btn" id="ar-flip2" type="button" title="背面のカメラと前面のカメラ (インカメラ) を切り替える">カメラ切替 (前面 / 背面)</button></div>
         <div class="row" id="ar-crop-row" hidden><button class="btn" id="ar-crop-cancel" type="button">切り抜かずに戻る</button></div>
       </div>
       <div class="arbar" id="arbar" hidden>
@@ -644,6 +681,7 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
           <button class="btn" id="ar-crop-plate" type="button" title="基礎板のまわりだけを大きく見せる">基礎板の所だけ</button>
           <button class="btn" id="ar-uncrop" type="button" hidden>全体に戻す</button>
           <label class="check"><input type="checkbox" id="ar-marks" checked><span>目印</span></label>
+          <button class="btn" id="ar-flip" type="button" title="背面のカメラと前面のカメラ (インカメラ) を切り替える">カメラ切替</button>
           <button class="btn" id="ar-redo" type="button">合わせ直す</button>
           <button class="btn" id="ar-exit" type="button">デジタルに戻る</button>
         </div>
@@ -715,16 +753,8 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
         <button class="btn" data-view="front" type="button">正面</button>
       </div>
       <div class="sample-card" id="sample-card" hidden><span>完成見本</span><img id="sample-img" alt="完成したモデルの見本"></div>
-      <div class="buildbar" id="buildbar" hidden>
-        <div class="seg bb-mode" role="group" aria-label="進め方">
-          <button type="button" data-bmode="layer" aria-pressed="true">1 段ずつ</button>
-          <button type="button" data-bmode="piece" aria-pressed="false">1 個ずつ</button>
-        </div>
-        <div class="bb-row">
-          <button class="btn bb" id="bb-prev" type="button">◀ 前へ</button>
-          <div class="bb-count" id="bb-count" aria-live="polite"></div>
-          <button class="btn primary bb" id="bb-next" type="button">次へ ▶</button>
-        </div>
+      <div class="build-info" id="build-info" hidden aria-live="polite">
+        <div class="bb-count" id="bb-count"></div>
         <div class="bb-note" id="bb-note"></div>
       </div>
       <div class="complete" id="complete" hidden>
@@ -3433,6 +3463,8 @@ matchMedia("(prefers-color-scheme: dark)").addEventListener("change", themeColor
 new MutationObserver(themeColors).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
 const partMaterial = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.42, metalness: 0.0 });
+// 組み立てる: 今の段より下の段は半透明 (今の段が見やすいように)
+const partMaterialDim = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.42, metalness: 0.0, transparent: true, opacity: 0.28, depthWrite: false });
 const outlineMaterial = new THREE.MeshBasicMaterial({ color: 0xff7a00, side: THREE.BackSide });
 // 選んだパーツの真上に浮かぶ目印 (下向きの矢印。ほかのパーツの陰にあっても見える)
 const selMarker = new THREE.Group();
@@ -3454,18 +3486,29 @@ function disposeChildren(g) {
   for (const c of [...g.children]) { g.remove(c); if (c.isInstancedMesh) c.dispose(); }
 }
 const _m4 = new THREE.Matrix4();
+// 半透明にするパーツ (Set)。「組み立てる」で 2 段目以降を見ているときの、今の段より下の段。それ以外は null
+function dimParts() {
+  if (S.step !== "build" || !(S.layer || S.piece)) return null;
+  const cur = currentLayerNo();
+  if (cur <= 1) return null;
+  const { seq, levels } = steps();
+  const below = new Set(levels.slice(0, cur - 1));
+  return new Set(seq.filter(([, st]) => below.has(st)).map(([p]) => p));
+}
 function rebuildParts() {
   disposeChildren(partsGroup);
-  const vis = previewParts();
+  const vis = previewParts(), dim = dimParts();
   const byPart = new Map();
   for (const p of S.parts) {
     if (vis && !vis.has(p)) continue;
-    if (!byPart.has(p.part)) byPart.set(p.part, []);
-    byPart.get(p.part).push(p);
+    const key = p.part + (dim && dim.has(p) ? "|dim" : "");
+    if (!byPart.has(key)) byPart.set(key, []);
+    byPart.get(key).push(p);
   }
   pickMeshes = [];
-  for (const [part, list] of byPart) {
-    const mesh = new THREE.InstancedMesh(partGeometry(part), partMaterial, list.length);
+  for (const [key, list] of byPart) {
+    const part = list[0].part, faded = key.endsWith("|dim");
+    const mesh = new THREE.InstancedMesh(partGeometry(part), faded ? partMaterialDim : partMaterial, list.length);
     list.forEach((p, i) => { mesh.setMatrixAt(i, partMatrix(p, _m4)); mesh.setColorAt(i, partColor(p.color)); });
     mesh.instanceMatrix.needsUpdate = true;
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -3474,7 +3517,7 @@ function rebuildParts() {
     partsGroup.add(mesh);
     pickMeshes.push(mesh);
   }
-  rebuildEdges(vis);
+  rebuildEdges(dim ? new Set([...(vis || S.parts)].filter((p) => !dim.has(p))) : vis);  // 半透明の段には線を引かない
   rebuildOutline();
 }
 // ---- ブリックの輪郭線 (同じ色が並んでも 1 個ずつ見分けられるように)。線の色は部品の色を暗くしたもの
@@ -4650,7 +4693,7 @@ async function startAR() {
   AR.go("starting");
   try {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
+      video: { facingMode: { ideal: AR_DATA.facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false,
     });
     if (!AR.is("starting")) { stream.getTracks().forEach((t) => t.stop()); return; }  // 待っている間にやめた
     AR_DATA.stream = stream;
@@ -4684,6 +4727,20 @@ function stopAR() {
   frameView();
 }
 function setMode(mode) { if (mode === "ar") startAR(); else stopAR(); }
+// カメラの向き (environment = 背面、user = 前面 = インカメラ)。iPad などで基礎板を前のカメラに映すとき用
+function setArFacing(f) {
+  AR_DATA.facing = f === "user" ? "user" : "environment";
+  $("ar-facing").value = AR_DATA.facing;
+  try { localStorage.setItem("pocchi-kobo-facing", AR_DATA.facing); } catch { /* 覚えなくても困らない */ }
+}
+// AR の途中で切り替える: カメラを起こし直して、四隅を合わせ直す
+async function flipArCamera() {
+  setArFacing(AR_DATA.facing === "user" ? "environment" : "user");
+  if (!arActive()) return;
+  stopAR();
+  await startAR();
+  toast(AR_DATA.facing === "user" ? "前面のカメラにしました。四隅を押し直してください" : "背面のカメラにしました。四隅を押し直してください", "info", 5000);
+}
 
 function initAR() {
   for (const b of $$("button[data-mode]")) b.onclick = () => setMode(b.dataset.mode);
@@ -4720,6 +4777,11 @@ function initAR() {
   $("ar-marks").checked = AR_DATA.marks;
   $("ar-marks").onchange = (e) => { AR_DATA.marks = e.target.checked; saveArPrefs(); syncArView(); };
   $("ar-exit").onclick = () => stopAR();
+  let facing = "environment";
+  try { facing = localStorage.getItem("pocchi-kobo-facing") || "environment"; } catch { /* 既定は背面 */ }
+  setArFacing(facing);
+  $("ar-facing").onchange = (e) => setArFacing(e.target.value);
+  $("ar-flip").onclick = $("ar-flip2").onclick = flipArCamera;
   $("ar-video").addEventListener("loadedmetadata", arRelayout);
   setUi("mode", "digital"); setUi("ar", AR.state);
 }
@@ -4820,9 +4882,9 @@ function refreshOrder() {
 }
 // 組み立てる: 作業台の下の大きな段送り。1 段ずつ / 1 個ずつ。数字はいま表示しているモデルと同じ所を指す
 function refreshBuildbar() {
-  const bar = $("buildbar");
   const on = S.step === "build";
-  bar.hidden = !on;
+  $("buildctl").hidden = !on;
+  $("build-info").hidden = !on;
   $("complete").hidden = !(on && S.complete);
   refreshSample();
   if (!on) return;
@@ -4833,7 +4895,7 @@ function refreshBuildbar() {
   const pc = S.piece ? Math.min(S.piece, N) : S.layer ? partsUpToLayer(S.layer).size : 0;
   const cnt = $("bb-count"), note = $("bb-note");
   cnt.textContent = ""; note.textContent = "";
-  const small = (t) => Object.assign(document.createElement("small"), { textContent: t });
+  const small = (t) => Object.assign(document.createElement("small"), { textContent: t });  // 横に小さく
   if (S.zero) {
     if (mode === "piece") { cnt.append(`0 / ${N} 個目`); cnt.append(small(`0 / ${L} 段目`)); }
     else { cnt.append(`0 / ${L} 段目`); cnt.append(small(`0 / ${N} 個まで`)); }
@@ -4849,7 +4911,7 @@ function refreshBuildbar() {
   $("bb-prev").disabled = (!lay || S.zero) && !S.complete;
   $("bb-prev").textContent = mode === "piece" ? "◀ 前の部品" : "◀ 前の段";
   $("bb-next").disabled = !N;
-  $("bb-next").textContent = !lay || S.zero ? (mode === "piece" ? "1 個目から組む ▶" : "1 段目から組む ▶")
+  $("bb-next").textContent = !lay || S.zero ? (mode === "piece" ? "1 個目へ ▶" : "1 段目へ ▶")
     : atEnd ? "完成！ ▶" : mode === "piece" ? "次の部品 ▶" : "次の段 ▶";
 }
 function buildNext() {
@@ -6012,7 +6074,14 @@ function setupMobileHeader() {
 }
 
 // ---------------------------------------------------------------- はじまり
+function setupSplash() {
+  const sp = $("splash");
+  if (!sp) return;
+  sp.onclick = () => sp.classList.add("out");
+  sp.addEventListener("animationend", (e) => { if (e.target === sp && e.animationName === "splash-out") sp.remove(); });
+}
 async function start() {
+  setupSplash();
   // 状態の初期値を body の data-* に出す (この後は、変わるたびに各状態機械・関数が書き換える)
   for (const [k, v] of Object.entries({ gesture: GESTURE.state, tool: S.tool, pane: "", busy: "0", view: "all", playing: "0", step: "open" })) setUi(k, v);
   $("dlg-convert").dataset.preview = PREVIEW.state;
