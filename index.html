@@ -108,15 +108,14 @@ button, input, select { font: inherit; color: inherit; }
 
 /* ---- タイトル画面: 3 秒ほど出して消える (押すとすぐ消える) */
 .splash { position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; background: var(--sun); color: #16181B; cursor: pointer;
-  animation: splash-out .5s ease 2.6s forwards; }
-.splash.out { animation: splash-out .25s ease forwards; }
+  transition: opacity .4s ease; }
+.splash.out { opacity: 0; pointer-events: none; }
 .splash-in { display: grid; justify-items: center; gap: 8px; text-align: center; padding: 24px; animation: splash-in .6s ease both; }
 .splash svg { width: 96px; height: 96px; }
 .splash h1 { margin: 6px 0 0; font-family: var(--font-display); font-weight: 800; font-size: clamp(28px, 7vw, 48px); letter-spacing: .02em; }
 .splash p { margin: 0; font-weight: 700; font-size: 16px; }
 .splash small { font-weight: 700; opacity: .7; }
 @keyframes splash-in { from { opacity: 0; transform: translateY(12px) scale(.97); } to { opacity: 1; transform: none; } }
-@keyframes splash-out { to { opacity: 0; visibility: hidden; } }
 @media (prefers-reduced-motion: reduce) { .splash-in { animation: none; } }
 
 /* ---- 本体 */
@@ -469,7 +468,6 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
   .top { row-gap: 8px; }
   .side { border-right: 0; border-top: 1px solid var(--line); }
   .panels { overflow: visible; }
-  .brand-tag .tag-more { display: none; }  /* スマホでは「非公式のファンツール」だけ */
   .brand-name { font-size: 16px; white-space: nowrap; }
   .brand svg { width: 32px; height: 32px; }
   .top { column-gap: 8px; }
@@ -498,7 +496,6 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
       </svg>
     <h1>デジタル・レゴブロック</h1>
     <p>3D モデルをブロックで組み立てる</p>
-    <small>非公式のファンツール</small>
   </div>
 </div>
 <div class="app">
@@ -511,7 +508,7 @@ body[data-ui-ar="cropping"] #view { cursor: crosshair; }
       </svg>
       <div>
         <div class="brand-name">デジタル・レゴブロック</div>
-        <div class="brand-tag">非公式のファンツール<span class="tag-more"> · 3D モデルをブロックで組み立てる</span></div>
+        <div class="brand-tag">3D モデルをブロックで組み立てる</div>
       </div>
     </div>
     <nav class="stepbar-wrap" aria-label="作業の段階"><ol class="stepbar" id="stepbar"></ol></nav>
@@ -6077,8 +6074,16 @@ function setupMobileHeader() {
 function setupSplash() {
   const sp = $("splash");
   if (!sp) return;
-  sp.onclick = () => sp.classList.add("out");
-  sp.addEventListener("animationend", (e) => { if (e.target === sp && e.animationName === "splash-out") sp.remove(); });
+  // 3 秒ほどで薄くして消す。押せばすぐ。アニメーションが止まる環境でも消えるよう、取り除くのはタイマーで
+  let done = false;
+  const hide = () => {
+    if (done) return;
+    done = true;
+    sp.classList.add("out");
+    setTimeout(() => sp.remove(), 450);
+  };
+  sp.onclick = hide;
+  setTimeout(hide, 2600);
 }
 async function start() {
   setupSplash();
